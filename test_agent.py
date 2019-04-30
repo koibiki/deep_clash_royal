@@ -33,7 +33,7 @@ if __name__ == '__main__':
         os.makedirs(root_run)
         os.makedirs(root_finish)
 
-        lib.init_game(gameId)
+        lib._init_game(gameId)
 
         return root_error, root_run, root_finish
 
