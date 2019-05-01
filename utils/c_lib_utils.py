@@ -35,6 +35,7 @@ class Result(ctypes.Structure):
         ('win', ctypes.c_bool),
         ('frame_index', ctypes.c_int),
         ('time', ctypes.c_int),
+        ('remain_elixir', ctypes.c_int),
         ('milli', ctypes.c_float),
     ]
 
