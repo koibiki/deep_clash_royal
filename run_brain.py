@@ -10,7 +10,6 @@ if __name__ == '__main__':
     # address = "./scan/s1.mp4"
     address = "http://127.0.0.1:46539/device/cd9faa7f/video.flv"
     capture = cv2.VideoCapture(address)
-    cv2.namedWindow('image')
 
     i = 0
 
@@ -24,17 +23,18 @@ if __name__ == '__main__':
                            clash_royal.img_shape,
                            clash_royal.state_shape)
 
+    ep = 0
     while True:
         i += 1
         state, img = capture.read()
 
         if state:
-            img = cv2.resize(img, (540, 960))
-            cv2.imshow('image', img)
-            cv2.waitKey(1)
 
             if i % 10 != 0:
                 continue
+            img = cv2.resize(img, (540, 960))
+            cv2.imshow('image', img)
+            cv2.waitKey(1)
 
             pymat = convert2pymat(img)
 
@@ -43,12 +43,17 @@ if __name__ == '__main__':
                 action = base_brain.choose_action(observation[1:])
                 clash_royal.step(observation[0], action)
 
-            if clash_royal.game_start and clash_royal.game_finish:
+            if clash_royal.game_start and clash_royal.game_finish and clash_royal.retry < 2:
+                ep += 1
                 base_brain.store_transition(clash_royal.episode_statistics())
-                base_brain.learn()
+                base_brain.update_episode_result(clash_royal.get_rate_of_winning())
 
+            if clash_royal.game_start and clash_royal.game_finish and clash_royal.retry <= 1:
+                if ep >= 5:
+                    for i in range(50):
+                        base_brain.learn()
 
         else:
-            break
+            print("没有信号..")
 
     cv2.destroyAllWindows()

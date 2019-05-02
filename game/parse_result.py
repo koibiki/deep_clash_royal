@@ -32,10 +32,12 @@ def parse_running_state(result):
     card_available = np.zeros(4, dtype=np.int32)
     card_elixir = np.zeros(4, dtype=np.int32)
     remain_elixir = np.ones(1, dtype=np.int32)
+    # 是否溅射 是否飞行 是非远程 是否spell 是否专对建筑
+    remain = np.zeros(20, dtype=np.int32)
     for i in range(4):
         card_type_state[i * 50 + result.card_type[i]] = 1
         card_available[i] = result.available[i]
         card_elixir[i] = elixir_dict[card_dict[result.card_type[i]]]
     remain_elixir[0] = result.remain_elixir
-    state = np.concatenate([card_type_state, card_available, card_elixir, remain_elixir], axis=0)
+    state = np.concatenate([card_type_state, card_available, card_elixir, remain_elixir, remain], axis=0)
     return state

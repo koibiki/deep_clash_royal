@@ -1,6 +1,7 @@
 import ctypes
 import os
 import os.path as osp
+import shutil
 import time
 from multiprocessing.pool import Pool
 import numpy as np
@@ -44,8 +45,12 @@ class ClashRoyal:
         self.n_loc_y_actions = len(self.loc_y_action_choices)
         self.n_card_actions = len(self.card_choices)
         self.img_shape = (256, 192, 3)
-        # 4个位置卡牌的 种类 是否可用 消耗圣水量 剩余圣水量
-        self.state_shape = len(card_dict.keys()) * 4 + 4 + 4 + 1
+        # 4个位置卡牌的 种类 是否可用 消耗圣水量 剩余圣水量 是否溅射 是否飞行 是非远程 是否spell 是否专对建筑
+        self.state_shape = len(card_dict.keys()) * 4 + 4 + 4 + 1 + 4 + 4 + 4 + 4 + 4
+
+        self.memory_record = []
+        self.rate_of_winning = []
+        self.reward_mean = []
 
     def _init_game(self, gameId):
         self.game_start = True
@@ -63,6 +68,7 @@ class ClashRoyal:
         self.states = np.zeros(2000, dtype=np.object)
         self.pre_mine_crown = 0
         self.pre_opp_crown = 0
+        self.memory_record.append(gameId)
         os.makedirs(self.error_dir)
         os.makedirs(self.running_dir)
         os.makedirs(self.finish_dir)
@@ -76,7 +82,6 @@ class ClashRoyal:
 
         self._process_result(result, img)
         if self.game_start and result.frame_state == STATE_DICT["RUNNING_STATE"]:
-            print("game in running")
             observation = [result.frame_index, self.imgs[result.frame_index], self.states[result.frame_index]]
         else:
             observation = None
@@ -108,6 +113,7 @@ class ClashRoyal:
             cv2.imwrite(osp.join(self.error_dir, "{:d}.jpg".format(self.frame_count)), img)
 
     def _action_on_running(self, result, img):
+        self.retry = 0
         if not self.game_start:
             return
         if self.log:
@@ -125,7 +131,7 @@ class ClashRoyal:
             cv2.imwrite(osp.join(self.running_dir, "{:d}.jpg".format(result.frame_index)), img)
 
         if reward != 0:
-            self._update_reward(reward, result.frame_index - 50, 50)
+            self._update_reward(reward, result.frame_index - 100, 100)
         else:
             self._update_reward(reward, result.frame_index, 1)
 
@@ -164,7 +170,7 @@ class ClashRoyal:
         if self.game_start and not self.game_finish:
             self.game_finish = True
             reward = 1 - result.frame_index * 0.0001 if result.win else (-1 + result.frame_index * 0.0001)
-            self._update_reward(reward, result.frame_index - 60, 50)
+            self._update_reward(reward, result.frame_index - 110, 100)
 
             if self.record:
                 cv2.imwrite(osp.join(self.finish_dir, "{:d}.jpg".format(result.frame_index)), img)
@@ -180,6 +186,15 @@ class ClashRoyal:
                     for i in range(len(self.rewards[:self.running_frame_count])):
                         f.write(str(i) + ":" + str(self.rewards[i]))
                         f.write("\n")
+            if len(self.memory_record) >= 10:
+                pop_id = self.memory_record.pop(0)
+                shutil.rmtree(osp.join(self.root, str(pop_id)))
+            if len(self.rate_of_winning) > 20:
+                self.rate_of_winning.pop(0)
+            self.rate_of_winning.append(1 if result.win else 0)
+            if len(self.reward_mean) > 50:
+                self.reward_mean.pop(0)
+            self.reward_mean.append(np.sum(self.rewards[:self.running_frame_count - 10]))
 
     def _finish_game(self):
         if self.real_time and self.retry % 50 == 0:
@@ -215,5 +230,10 @@ class ClashRoyal:
             next_step = (i + skip_step) if (i + skip_step) < max_step else max_step - 1
             next_img = self.imgs[next_step]
             next_state = self.states[next_step]
-            episode_record.append([self.imgs[i], self.states[i], self.actions[i], self.rewards[i], next_img, next_state])
+            episode_record.append(
+                [self.imgs[i], self.states[i], self.actions[i], self.rewards[i], next_img, next_state])
         return episode_record
+
+    def get_rate_of_winning(self):
+        return (np.sum(self.rate_of_winning) / (0.0001 + len(self.rate_of_winning)), \
+                np.sum(self.reward_mean) / (0.0001 + len(self.reward_mean)))

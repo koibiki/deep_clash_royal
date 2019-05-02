@@ -96,8 +96,8 @@ class Memory(object):  # stored as ( s, a, r, s_ ) in SumTree
         b_idx, b_memory, ISWeights = np.empty((n,), dtype=np.int32), np.empty((n,), dtype=np.object), np.empty((n, 1))
         pri_seg = self.tree.total_p / n  # priority segment
         self.beta = np.min([1., self.beta + self.beta_increment_per_sampling])  # max = 1
-
-        min_prob = np.min(self.tree.tree[-self.tree.capacity:]) / self.tree.total_p  # for later calculate ISweight
+        # for later calculate ISweight
+        min_prob = (np.min(self.tree.tree[-self.tree.capacity:]) + 0.001) / self.tree.total_p
         for i in range(n):
             a, b = pri_seg * i, pri_seg * (i + 1)
             v = np.random.uniform(a, b)
