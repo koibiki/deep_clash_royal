@@ -6,3 +6,5 @@ MNIST-data
 models
 .idea/
 checkpoints/
+checkpoints_resnet/
+logs/

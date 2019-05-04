@@ -13,7 +13,7 @@ if __name__ == '__main__':
 
     i = 0
 
-    root = "../vysor/"
+    root = "/home/chengli/data/gym_data/clash_royal"
 
     clash_royal = ClashRoyal(root)
 
@@ -22,7 +22,9 @@ if __name__ == '__main__':
                            clash_royal.n_card_actions,
                            clash_royal.img_shape,
                            clash_royal.state_shape)
-
+    base_brain.load_memory(root)
+    for i in range(50):
+        base_brain.learn()
     ep = 0
     while True:
         i += 1
@@ -30,30 +32,32 @@ if __name__ == '__main__':
 
         if state:
 
-            if i % 10 != 0:
+            if i % 20 != 0:
                 continue
             img = cv2.resize(img, (540, 960))
-            cv2.imshow('image', img)
-            cv2.waitKey(1)
+            # cv2.imshow('image', img)
+            # cv2.waitKey(1)
 
             pymat = convert2pymat(img)
 
             observation = clash_royal.frame_step(img)
             if observation is not None:
                 action = base_brain.choose_action(observation[1:])
-                clash_royal.step(observation[0], action)
+                clash_royal.step(observation, action)
 
-            if clash_royal.game_start and clash_royal.game_finish and clash_royal.retry < 2:
+            if clash_royal.game_start and clash_royal.game_finish and clash_royal.retry <= 1:
                 ep += 1
-                base_brain.store_transition(clash_royal.episode_statistics())
+                base_brain.store_transition(clash_royal.episode_record)
                 base_brain.update_episode_result(clash_royal.get_rate_of_winning())
 
             if clash_royal.game_start and clash_royal.game_finish and clash_royal.retry <= 1:
                 if ep >= 5:
-                    for i in range(50):
+                    ep = 0
+                    for i in range(25):
                         base_brain.learn()
 
         else:
             print("没有信号..")
+            capture = cv2.VideoCapture(address)
 
     cv2.destroyAllWindows()

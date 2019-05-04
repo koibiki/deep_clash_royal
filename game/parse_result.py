@@ -28,16 +28,25 @@ elixir_dict = {"empty": 0, "Furnace": 4, "GoblinBarrel": 3, "DarkPrince": 4, "Pr
 
 
 def parse_running_state(result):
-    card_type_state = np.zeros((len(card_dict.keys()) * 4), dtype=np.int32)
-    card_available = np.zeros(4, dtype=np.int32)
-    card_elixir = np.zeros(4, dtype=np.int32)
-    remain_elixir = np.ones(1, dtype=np.int32)
+    card_type_state = np.zeros((len(card_dict.keys()) * 4), dtype=np.float32)
+    card_available = np.zeros(4, dtype=np.float32)
+    card_elixir = np.zeros(4, dtype=np.float32)
+    remain_elixir = np.ones(1, dtype=np.float32)
+    spent_time = np.ones(1, dtype=np.float32)
+    double_elixir = np.ones(1, dtype=np.float32)
+    dead_im = np.ones(1, dtype=np.float32)
+    # 双方血量
+    hp = np.ones(2, dtype=np.float32)
     # 是否溅射 是否飞行 是非远程 是否spell 是否专对建筑
-    remain = np.zeros(20, dtype=np.int32)
+    remain = np.zeros(20, dtype=np.float32)
     for i in range(4):
         card_type_state[i * 50 + result.card_type[i]] = 1
         card_available[i] = result.available[i]
         card_elixir[i] = elixir_dict[card_dict[result.card_type[i]]]
     remain_elixir[0] = result.remain_elixir
-    state = np.concatenate([card_type_state, card_available, card_elixir, remain_elixir, remain], axis=0)
+    spent_time[0] = result.time / 60
+    double_elixir[0] = 1 if result.time > 60 * 2 - 1 else 0
+    dead_im[0] = 1 if result.time > 60 * 3 - 1 else 0
+    state = np.concatenate([card_type_state, card_available, card_elixir, hp,
+                            remain_elixir, spent_time, double_elixir, dead_im, remain], axis=0)
     return state

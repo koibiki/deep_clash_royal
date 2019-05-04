@@ -28,29 +28,29 @@ class ClashRoyal:
         offset_w = w_gap // 2
         ll = ctypes.cdll.LoadLibrary
         self.root = root
-        self.lib = ll("./lib/libc_opencv.so")
-        self.lib.detect_frame.restype = Result
         self.record = True
         self.real_time = True
         self.game_start = False
         self.game_finish = False
         self.frame_count = 0
         self.log = True
-        self.p = Pool(4)
+        self.p = Pool(6)
         self.retry = 0
-        self.loc_x_action_choices = [offset_w + x * w_gap + w_gap // 2 for x in range(num_align_width)]
+        self.loc_x_action_choices = [offset_w + x * w_gap + w_gap // 2 for x in range(num_align_width - 1)]
         self.loc_y_action_choices = [(y + 1) * h_gap + h_gap * 3 // 4 for y in range(num_align_height)]
-        self.card_choices = [[340, 1720], [560, 1702], [738, 1698], [938, 1718]]
+        self.card_choices = [[0, 0], [340, 1720], [560, 1702], [738, 1698], [938, 1718]]
         self.n_loc_x_actions = len(self.loc_x_action_choices)
         self.n_loc_y_actions = len(self.loc_y_action_choices)
         self.n_card_actions = len(self.card_choices)
-        self.img_shape = (256, 192, 3)
-        # 4个位置卡牌的 种类 是否可用 消耗圣水量 剩余圣水量 是否溅射 是否飞行 是非远程 是否spell 是否专对建筑
-        self.state_shape = len(card_dict.keys()) * 4 + 4 + 4 + 1 + 4 + 4 + 4 + 4 + 4
+        self.img_shape = (256, 192, 3 * 4)
+        # 4个位置卡牌的 种类 是否可用 消耗圣水量 剩余圣水量 耗时 双倍圣水 即死 (我方血量 对方血量) 是否溅射 是否飞行 是非远程 是否spell 是否专对建筑
+        self.state_shape = len(card_dict.keys()) * 4 + 4 + 4 + 1 + 1 + 1 + 1 + 2 + 4 + 4 + 4 + 4 + 4
 
         self.memory_record = []
         self.rate_of_winning = []
         self.reward_mean = []
+        self.lib = ll("./lib/libc_opencv.so")
+        self.lib.detect_frame.restype = Result
 
     def _init_game(self, gameId):
         self.game_start = True
@@ -62,10 +62,10 @@ class ClashRoyal:
         self.error_dir = osp.join(self.root, "{:d}/error".format(gameId))
         self.running_dir = osp.join(self.root, "{:d}/running".format(gameId))
         self.finish_dir = osp.join(self.root, "{:d}/finish".format(gameId))
-        self.rewards = np.zeros(2000, dtype=np.object)
-        self.actions = np.zeros(2000, dtype=np.object)
-        self.imgs = np.zeros(2000, dtype=np.object)
-        self.states = np.zeros(2000, dtype=np.object)
+        self.rewards = np.zeros(1500, dtype=np.object)
+        self.actions = np.zeros(1500, dtype=np.object)
+        self.imgs = np.zeros(1500, dtype=np.object)
+        self.states = np.zeros(1500, dtype=np.object)
         self.pre_mine_crown = 0
         self.pre_opp_crown = 0
         self.memory_record.append(gameId)
@@ -82,7 +82,13 @@ class ClashRoyal:
 
         self._process_result(result, img)
         if self.game_start and result.frame_state == STATE_DICT["RUNNING_STATE"]:
-            observation = [result.frame_index, self.imgs[result.frame_index], self.states[result.frame_index]]
+            img_range = []
+            for ii in range(4):
+                index = 0 if result.frame_index - ii * 5 < 0 else result.frame_index
+                img_range.append(self.imgs[index])
+
+            step_imgs = np.concatenate(img_range, axis=-1)
+            observation = [result.frame_index, step_imgs, self.states[result.frame_index]]
         else:
             observation = None
 
@@ -118,20 +124,20 @@ class ClashRoyal:
             return
         if self.log:
             print("id:" + str(self.game_id) + "  running:" + str(result.frame_index) + "  " + str(
-                self.running_frame_count) + "  spent:" + str(result.milli))
+                self.running_frame_count) + "  elixir:" + str(result.remain_elixir) + "  spent:" + str(result.milli))
         self.running_frame_count += 1
         reward = 0
         if result.opp_crown > self.pre_opp_crown:
-            reward = -0.1
+            reward = -0.5
             self.pre_opp_crown = result.opp_crown
         if result.mine_crown > self.pre_mine_crown:
-            reward = 0.1
+            reward = 0.3
             self.pre_mine_crown = result.mine_crown
         if self.record:
             cv2.imwrite(osp.join(self.running_dir, "{:d}.jpg".format(result.frame_index)), img)
 
         if reward != 0:
-            self._update_reward(reward, result.frame_index - 100, 100)
+            self._update_reward(reward, result.frame_index - 80, 70)
         else:
             self._update_reward(reward, result.frame_index, 1)
 
@@ -160,7 +166,7 @@ class ClashRoyal:
             self.game_finish = False
         if not self.game_start:
             self._init_game(int(time.time() * 1000))
-        if self.real_time and self.retry % 50 == 0:
+        if self.retry > 25 and self.retry % 50 == 0:
             self.retry = 0
             cmd = "adb shell input tap 344 1246"
             self.p.apply_async(execute_cmd, args={cmd})
@@ -170,34 +176,53 @@ class ClashRoyal:
         if self.game_start and not self.game_finish:
             self.game_finish = True
             reward = 1 - result.frame_index * 0.0001 if result.win else (-1 + result.frame_index * 0.0001)
-            self._update_reward(reward, result.frame_index - 110, 100)
+            self._update_reward(reward, result.frame_index - 80, 70)
 
             if self.record:
+
                 cv2.imwrite(osp.join(self.finish_dir, "{:d}.jpg".format(result.frame_index)), img)
                 with open(osp.join(self.root, str(self.game_id) + "/state.txt"), "w") as f:
-                    for i in range(len(self.states[:self.running_frame_count])):
-                        f.write(str(i) + ":" + str(self.states[i]))
+                    for i in range(len(self.states[:self.running_frame_count - 10])):
+                        state_str = ""
+                        for item in self.states[i]:
+                            state_str += str(item) + ","
+                        state_str = state_str[:-1]
+                        f.write(str(i) + ":" + state_str)
                         f.write("\n")
                 with open(osp.join(self.root, str(self.game_id) + "/action.txt"), "w") as f:
-                    for i in range(len(self.actions[:self.running_frame_count])):
+                    for i in range(len(self.actions[:self.running_frame_count - 10])):
                         f.write(str(i) + ":" + str(self.actions[i]))
                         f.write("\n")
                 with open(osp.join(self.root, str(self.game_id) + "/reward.txt"), "w") as f:
-                    for i in range(len(self.rewards[:self.running_frame_count])):
+                    for i in range(len(self.rewards[:self.running_frame_count - 10])):
                         f.write(str(i) + ":" + str(self.rewards[i]))
                         f.write("\n")
-            if len(self.memory_record) >= 10:
+                old_path = osp.join(self.root, str(self.game_id))
+                if result.win:
+                    self.memory_record.remove(self.game_id)
+                    new_path = osp.join(self.root, "win/" + str(self.game_id))
+                    os.rename(old_path, new_path)
+                else:
+                    new_path = osp.join(self.root, "fail/" + str(self.game_id))
+                    os.rename(old_path, new_path)
+
+            if len(self.memory_record) > 100:
                 pop_id = self.memory_record.pop(0)
-                shutil.rmtree(osp.join(self.root, str(pop_id)))
+                shutil.rmtree(osp.join(self.root, "fail/" + str(pop_id)))
+
             if len(self.rate_of_winning) > 20:
                 self.rate_of_winning.pop(0)
             self.rate_of_winning.append(1 if result.win else 0)
+
             if len(self.reward_mean) > 50:
                 self.reward_mean.pop(0)
+
             self.reward_mean.append(np.sum(self.rewards[:self.running_frame_count - 10]))
 
+            self.episode_record = self._episode_statistics(result)
+
     def _finish_game(self):
-        if self.real_time and self.retry % 50 == 0:
+        if self.retry % 50 == 0:
             self.retry = 0
             cmd = "adb shell input tap 536 1684"
             self.p.apply_async(execute_cmd, args={cmd})
@@ -211,29 +236,46 @@ class ClashRoyal:
         for i in range(update_steps):
             self.rewards[start_step + i] += reward_value * (i + 1) / update_steps
 
-    def step(self, index, action):
+    def step(self, observation, action):
+        index = observation[0]
         if action[0] != 0:
+            # 更新 选择了不可用 card 的 reward
+            if observation[2][50 * 4 + action[0] - 1] == 0:
+                self._update_reward(-0.01, index, 1)
+            else:
+                self._update_reward(0.01, index, 1)
+            self.actions[index] = action
             card = self.card_choices[action[0]]
             loc_x = self.loc_y_action_choices[action[1]]
             loc_y = self.loc_y_action_choices[action[2]]
-            cmd = "adb shell input swipe {:d} {:d} {:d} {:d} 300".format(card[0], card[1], loc_x, loc_y)
-            self.p.apply_async(execute_cmd, args={cmd})
-            self.actions[index] = action
+            if self.real_time:
+                cmd = "adb shell input swipe {:d} {:d} {:d} {:d} 300".format(card[0], card[1], loc_x, loc_y)
+                self.p.apply_async(execute_cmd, args={cmd})
         else:
             self.actions[index] = [0, 0, 0]
 
-    def episode_statistics(self):
-        episode_record = []
+    def _episode_statistics(self, result):
+
         skip_step = 10
         max_step = self.running_frame_count - skip_step
-        for i in range(self.running_frame_count - skip_step):
-            next_step = (i + skip_step) if (i + skip_step) < max_step else max_step - 1
-            next_img = self.imgs[next_step]
-            next_state = self.states[next_step]
-            episode_record.append(
-                [self.imgs[i], self.states[i], self.actions[i], self.rewards[i], next_img, next_state])
+
+        img_paths = []
+        type_dir = "win" if result.win else "fail"
+        save_dir = osp.join(self.root, type_dir + "/" + str(self.game_id)) + "/running"
+        for index in range(max_step):
+            indices = [index + 5, index, index - 5, index - 5 * 2, index - 5 * 3]
+            indices = [max(0, item) for item in indices]
+            indices = [min(item, max_step - 1) for item in indices]
+            img_path = [osp.join(save_dir, str(i) + ".jpg") for i in indices]
+            img_paths.append(img_path)
+        episode_record = [self.game_id, img_paths, self.states[:max_step], self.actions[:max_step],
+                          self.rewards[:max_step]]
         return episode_record
 
     def get_rate_of_winning(self):
         return (np.sum(self.rate_of_winning) / (0.0001 + len(self.rate_of_winning)), \
                 np.sum(self.reward_mean) / (0.0001 + len(self.reward_mean)))
+
+
+if __name__ == '__main__':
+    royal = ClashRoyal("./")

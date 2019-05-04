@@ -1,5 +1,5 @@
-import cv2
 import numpy as np
+from scipy import random
 
 mate_color_dict = {"purple": [[100, 180], [10, 100], [100, 181]],
                    "white": [[230, 255], [230, 255], [230, 255]],
@@ -22,3 +22,28 @@ def thresh_pic(img, color_key):
             else:
                 bg[h, w] = 0
     return bg
+
+
+# 定义添加椒盐噪声的函数
+def add_salt_and_pepper(src, percetage):
+    SP_NoiseImg = src
+    SP_NoiseNum = int(percetage * src.shape[0] * src.shape[1])
+    for i in range(SP_NoiseNum):
+        randX = random.random_integers(0, src.shape[0] - 1)
+        randY = random.random_integers(0, src.shape[1] - 1)
+        if random.random_integers(0, 1) == 0:
+            SP_NoiseImg[randX, randY] = 0
+        else:
+            SP_NoiseImg[randX, randY] = 255
+    return SP_NoiseImg
+
+
+# 定义添加高斯噪声的函数
+def add_gaussian_noise(image, percetage):
+    G_Noiseimg = image
+    G_NoiseNum = int(percetage * image.shape[0] * image.shape[1])
+    for i in range(G_NoiseNum):
+        temp_x = np.random.randint(1, image.shape[0] - 2)
+        temp_y = np.random.randint(1, image.shape[1] - 2)
+        G_Noiseimg[temp_x][temp_y] = 255
+    return G_Noiseimg

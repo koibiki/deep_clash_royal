@@ -26,14 +26,16 @@ for x in range(num_align_width):
         cv2.line(img_copy, (offset_w + x * w_gap, 0), (offset_w + x * w_gap, num_align_height * h_gap), (200, 200, 255),
                  thickness=1)
         if x != num_align_width - 1:
-            cv2.circle(img_copy, (offset_w + x * w_gap + w_gap // 2, (y + 1) * h_gap + h_gap * 3 // 4), 2, (0, 0, 255),2)
+            cv2.circle(img_copy, (offset_w + x * w_gap + w_gap // 2, (y + 1) * h_gap + h_gap * 3 // 4), 2, (0, 0, 255),
+                       2)
 
 field = img[h_gap + h_gap // 4: 9 * h_gap + h_gap // 4, h_gap // 2:-h_gap // 2, :]
 
 field = cv2.resize(field, (384 // 2, 512 // 2))
 
 f_h, f_w, f_c = field.shape
-
+field = cv2.flip(field, 1)
+img_copy = cv2.flip(img_copy, 1)
 cv2.imshow("ss", field)
 cv2.imshow("ssc", img_copy)
 cv2.waitKey(0)

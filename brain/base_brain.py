@@ -1,12 +1,16 @@
-import random
-from multiprocessing.pool import Pool
-import os
 import os.path as osp
-import tensorflow as tf
-import numpy as np
+import random
 import time
+from multiprocessing.pool import Pool
+
 import cv2
+import numpy as np
+import tensorflow as tf
+from tensorflow.contrib.slim.python.slim.nets import resnet_v2
+
 from brain.memory import Memory
+from net.mobilenet_v2 import build_mobilenetv2
+from utils.img_utils import add_salt_and_pepper, add_gaussian_noise
 
 
 class BaseBrain:
@@ -16,11 +20,11 @@ class BaseBrain:
                  n_card_actions,
                  img_shape,
                  state_shape,
-                 lr=0.00001,
-                 reward_decay=0.8,
-                 memory_size=5000,
-                 batch_size=64,
-                 replace_target_iter=500, ):
+                 lr=0.0001,
+                 reward_decay=0.9,
+                 memory_size=50000,
+                 batch_size=16,
+                 replace_target_iter=300, ):
         self.p = Pool(4)
         self.retry = 0
         self.n_loc_x_actions = n_loc_x_actions
@@ -28,6 +32,9 @@ class BaseBrain:
         self.n_card_actions = n_card_actions
         self.img_shape = img_shape
         self.state_shape = state_shape
+
+        self.rate_of_winning = 0
+        self.reward_sum = 0
 
         self.reg = tf.contrib.layers.l2_regularizer(0.00001)
         self.lr = lr
@@ -43,67 +50,60 @@ class BaseBrain:
         self.memory = Memory(capacity=memory_size)
         self.memory_size = memory_size
 
-        # consist of [target_net, evaluate_net]
-        self._build_evaluate_and_target_net()
-
-        vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
-        eval_var = [val for val in vars if 'eval_net' in val.name]
-        target_var = [val for val in vars if 'target_net' in val.name]
-
-        with tf.variable_scope('hard_replacement'):
-            self.target_replace_op = [tf.assign(t, e) for t, e in zip(target_var, eval_var)]
-
         sess_config = tf.ConfigProto()
         sess_config.gpu_options.per_process_gpu_memory_fraction = 0.9
         sess_config.gpu_options.allow_growth = True
 
         self.sess = tf.Session(config=sess_config)
 
-        self.saver = tf.train.Saver(max_to_keep=3)
-        train_start_time = time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime(time.time()))
-        model_name = 'net_{:s}.ckpt'.format(str(train_start_time))
-        self.model_save_path = osp.join("./checkpoints", model_name)
+        with self.sess.as_default():
+            # consist of [target_net, evaluate_net]
+            self._build_evaluate_and_target_net()
 
-        self.writer = tf.summary.FileWriter("./logs/" + str(str(train_start_time)), self.sess.graph)
-        self.merge_summary = tf.summary.merge_all()
+            vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+            eval_var = [val for val in vars if 'eval_net' in val.name]
+            target_var = [val for val in vars if 'target_net' in val.name]
 
-        self.sess.run(tf.global_variables_initializer())
-        self.sess.run(tf.local_variables_initializer())
-        self.load_model(self.sess, self.saver)
-        self.cost_his = []
+            with tf.variable_scope('hard_replacement'):
+                self.target_replace_op = [tf.assign(t, e) for t, e in zip(target_var, eval_var)]
+
+            self.saver = tf.train.Saver(max_to_keep=3)
+            train_start_time = time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime(time.time()))
+            model_name = 'net_{:s}.ckpt'.format(str(train_start_time))
+            self.model_save_path = osp.join("./checkpoints", model_name)
+
+            self.sess.run(tf.global_variables_initializer())
+            self.load_model(self.sess, self.saver)
+
+            self.writer = tf.summary.FileWriter("./logs/")
+            self.writer.add_graph(self.sess.graph)
+            self.merge_summary = tf.summary.merge_all()
 
     def _build_net(self, s_img, s_card_elixir):
+
         with tf.variable_scope('cnn'):
-            conv1 = tf.layers.conv2d(s_img, 32, 3, padding="same", kernel_regularizer=self.reg, activation=tf.nn.relu)
-            pool1 = tf.layers.max_pooling2d(conv1, (2, 2), (2, 2), padding="same")
-            conv2 = tf.layers.conv2d(pool1, 64, 3, padding="same", kernel_regularizer=self.reg, activation=tf.nn.relu)
-            pool2 = tf.layers.max_pooling2d(conv2, (2, 2), (2, 2), padding="same")
-            conv3 = tf.layers.conv2d(pool2, 64, 3, padding="same", kernel_regularizer=self.reg, activation=tf.nn.relu)
-            pool3 = tf.layers.max_pooling2d(conv3, (2, 2), (2, 2), padding="same")
-            conv4 = tf.layers.conv2d(pool3, 128, 3, padding="same", kernel_regularizer=self.reg, activation=tf.nn.relu)
-            pool4 = tf.layers.max_pooling2d(conv4, (2, 2), (2, 2), padding="same")
-            conv5 = tf.layers.conv2d(pool4, 512, 3, padding="same", kernel_regularizer=self.reg, activation=tf.nn.relu)
-            pool5 = tf.layers.max_pooling2d(conv5, (2, 2), (2, 2), padding="same")
+            # out = resnet_v2.resnet_v2_50(s_img)[1][scope + "/cnn/resnet_v2_50/block4"]
+            out = build_mobilenetv2(s_img, True)
 
         with tf.variable_scope('executor'):
-            flatten = tf.layers.flatten(pool5)
+            flatten = tf.layers.flatten(out)
             s_card_elixir = tf.cast(s_card_elixir, dtype=tf.float32)
-            dense1_1 = tf.layers.dense(flatten, 128, kernel_regularizer=self.reg, activation=tf.nn.relu)
-            dense1_2 = tf.layers.dense(s_card_elixir, 128, kernel_regularizer=self.reg, activation=tf.nn.relu)
-            dense1_2 = tf.layers.dense(dense1_2, 128, kernel_regularizer=self.reg, activation=tf.nn.relu)
-            concat = tf.concat([dense1_1, dense1_2], axis=-1)
+            dense1 = tf.layers.dense(s_card_elixir, 128, kernel_regularizer=self.reg, activation=tf.nn.relu)
+            dense2 = tf.layers.dense(dense1, 256, kernel_regularizer=self.reg, activation=tf.nn.relu)
+            concat = tf.concat([flatten, dense2], axis=-1)
             dense2 = tf.layers.dense(concat, 256, kernel_regularizer=self.reg, activation=tf.nn.relu)
-            with tf.variable_scope('Value'):
+            dense2 = tf.nn.dropout(dense2, 0.5)
+            with tf.variable_scope('value'):
                 card_value = tf.layers.dense(dense2, 1)
                 x_value = tf.layers.dense(dense2, 1)
                 y_value = tf.layers.dense(dense2, 1)
 
-            with tf.variable_scope('Advantage'):
+            with tf.variable_scope('advantage'):
                 card_advantage = tf.layers.dense(dense2, self.n_card_actions)
                 x_advantage = tf.layers.dense(dense2, self.n_loc_x_actions)
                 y_advantage = tf.layers.dense(dense2, self.n_loc_y_actions)
 
-            with tf.variable_scope('Q'):
+            with tf.variable_scope('q'):
                 # Q = V(s) + A(s,a)
                 card_logit = card_value + (card_advantage - tf.reduce_mean(card_advantage, axis=1, keep_dims=True))
                 x_logit = x_value + (x_advantage - tf.reduce_mean(x_advantage, axis=1, keep_dims=True))
@@ -124,7 +124,7 @@ class BaseBrain:
         # input State
         self.s_img = \
             tf.placeholder(tf.float32, [None, self.img_shape[0], self.img_shape[1], self.img_shape[2]], name='image')
-        self.s_card_elixir = tf.placeholder(tf.int32, [None, self.state_shape], name='state')
+        self.s_card_elixir = tf.placeholder(tf.float32, [None, self.state_shape], name='state')
 
         self.q_card_target = tf.placeholder(tf.float32, [None, self.n_card_actions], name='Q_card_target')
         self.q_x_target = tf.placeholder(tf.float32, [None, self.n_loc_x_actions], name='Q_x_target')
@@ -133,7 +133,7 @@ class BaseBrain:
         self.ISWeights = tf.placeholder(tf.float32, [None, 1], name='IS_weights')
 
         with tf.variable_scope('eval_net'):
-            self.q_card_eval, self.q_x_eval, self.q_y_eval = self._build_net(self.s_img, self.s_card_elixir)
+            self.q_card_eval, self.q_x_eval, self.q_y_eval = self._build_net(self.s_img, self.s_card_elixir, )
 
         with tf.variable_scope('loss'):
             reg_loss = tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
@@ -164,57 +164,129 @@ class BaseBrain:
         # input Next State
         self.s_img_ = \
             tf.placeholder(tf.float32, [None, self.img_shape[0], self.img_shape[1], self.img_shape[2]], name='image_')
-        self.s_card_elixir_ = tf.placeholder(tf.int32, [None, self.state_shape], name='state_')
+        self.s_card_elixir_ = tf.placeholder(tf.float32, [None, self.state_shape], name='state_')
         with tf.variable_scope('target_net'):
-            self.q_card_next, self.q_x_next, self.q_y_next = self._build_net(self.s_img_, self.s_card_elixir_)
+            self.q_card_next, self.q_x_next, self.q_y_next = self._build_net(self.s_img_, self.s_card_elixir_, )
 
     def store_transition(self, episode_record):
-        for item in episode_record:
-            self.memory.store(item)
+        game_id = episode_record[0]
+        img_paths = episode_record[1]
+        states = episode_record[2]
+        actions = episode_record[3]
+        rewards = episode_record[4]
+        for index in range(len(img_paths)):
+            self.memory.store(str(game_id) + "_" + str(index))
+            self.memory.img_path_dict[str(game_id) + "_" + str(index)] = img_paths[index]
+            self.memory.state_dict[str(game_id) + "_" + str(index)] = states[index]
+            self.memory.action_dict[str(game_id) + "_" + str(index)] = actions[index]
+            self.memory.reward_dict[str(game_id) + "_" + str(index)] = rewards[index]
+        self.memory.update_dict()
 
     def update_episode_result(self, result):
         self.rate_of_winning = result[0]
         self.reward_sum = result[1]
 
     def choose_action(self, observation):
-        if np.random.uniform() < 0.8:
+        if np.random.uniform() <= 0.5:
             action = [0, 0, 0]
+            print("random choose action:" + str(action))
         else:
-            if np.random.uniform() <= 0.5:
+            if np.random.uniform() <= 0.6:
                 # forward feed the observation and get q value for every actions
                 card_value, x_value, y_value = self.sess.run([self.q_card_eval, self.q_x_eval, self.q_y_eval],
                                                              feed_dict={self.s_img: [observation[0]],
                                                                         self.s_card_elixir: [observation[1]]})
                 action = [np.argmax(card_value), np.argmax(x_value), np.argmax(y_value)]
+                print("dqn choose action:" + str(action))
             else:
                 card = random.choice(range(self.n_card_actions))
                 x_loc = random.choice(range(self.n_loc_x_actions))
                 y_loc = random.choice(range(self.n_loc_y_actions))
                 action = [card, x_loc, y_loc]
-        print("choose action:" + str(action))
+                print("random choose action:" + str(action))
         return action
+
+    @staticmethod
+    def _process_img(img_path, overturn):
+        img = cv2.imread(img_path)
+        if img is None:
+            print(img_path)
+        h, w, c = img.shape
+        if h != 256 or w != 192:
+            w = 1080
+            num_align_width = 7
+            h_gap = w // num_align_width
+            img = img[h_gap + h_gap // 4: 9 * h_gap + h_gap // 4, h_gap // 2:-h_gap // 2, :]
+            img = cv2.resize(img, (192, 256))
+
+        randint = random.randint(0, 2)
+        if randint == 1:
+            img = add_salt_and_pepper(img, random.randint(1, 5) * 0.01)
+        elif randint == 2:
+            img = add_gaussian_noise(img, random.randint(1, 5) * 0.01)
+
+        if overturn:
+            img = cv2.flip(img, 1)
+        return img / 255.
+
+    def _prepare_data(self, batch_memory):
+        imgs = []
+        next_imgs = []
+        x_action = []
+        for item in batch_memory:
+            img_paths = self.memory.img_path_dict[item]
+
+            flip = random.randint(0, 1) == 0
+            step_img = [self._process_img(img_path, flip) for img_path in img_paths[1:]]
+            next_step_img = [self._process_img(img_path, flip) for img_path in img_paths[:4]]
+
+            step_img = np.concatenate(step_img, axis=-1)
+            next_step_img = np.concatenate(next_step_img, axis=-1)
+            imgs.append(step_img)
+            next_imgs.append(next_step_img)
+            if flip:
+                action = 3 + 2 - self.memory.action_dict[item][1]
+            else:
+                action = self.memory.action_dict[item][1]
+            x_action.append(action)
+
+        imgs = np.array(imgs)
+        next_imgs = np.array(next_imgs)
+
+        next_states = []
+        for item in batch_memory:
+            game_id = item.split("_")[0]
+            index = int(item.split("_")[1])
+            next_index = index + 5
+            next_state = self.memory.state_dict.get(game_id + "_" + str(next_index))
+            if next_state is None:
+                next_state = self.memory.state_dict[item]
+            next_states.append(next_state)
+
+        next_states = np.array(next_states)
+
+        states = np.array([self.memory.state_dict[item] for item in batch_memory])
+        card_action = [self.memory.action_dict[item][0] for item in batch_memory]
+        y_action = [self.memory.action_dict[item][2] for item in batch_memory]
+        reward = np.array([self.memory.reward_dict[item] for item in batch_memory])
+        return imgs, states, card_action, x_action, y_action, reward, next_imgs, next_states
 
     def learn(self):
         with self.sess.as_default():
             # check to replace target parameters
-            if self.learn_step_counter % self.replace_target_iter == 0:
+            if self.learn_step_counter > 0 and self.learn_step_counter % self.replace_target_iter == 0:
                 self.sess.run(self.target_replace_op)
-                print('\nSave weights target_params_replaced {:d}\n'.format(self.learn_step_counter))
-                self.saver.save(self.sess, self.model_save_path, global_step=self.learn_step_counter)
+                print('\ntarget_params_replaced {:d}\n'.format(self.learn_step_counter))
+
             start_time = time.time() * 1000
             tree_idx, batch_memory, ISWeights = self.memory.sample(self.batch_size)
 
             self.sess.run(tf.assign(self._rate_of_winning, self.rate_of_winning))
             self.sess.run(tf.assign(self._reward, self.reward_sum))
-            next_imgs = [item[-2] for item in batch_memory]
-            next_states = [item[-1] for item in batch_memory]
 
-            imgs = [item[0] for item in batch_memory]
-            states = [item[1] for item in batch_memory]
-            card_action = [item[2][0] for item in batch_memory]
-            x_action = [item[2][1] for item in batch_memory]
-            y_action = [item[2][2] for item in batch_memory]
-            reward = np.array([item[3] for item in batch_memory])
+            imgs, states, card_action, x_action, y_action, reward, next_imgs, next_states \
+                = self._prepare_data(batch_memory)
+
             q_card_next, q_x_next, q_y_next, q_card_eval, q_x_eval, q_y_eval = self.sess.run(
                 [self.q_card_next, self.q_x_next, self.q_y_next, self.q_card_eval, self.q_x_eval, self.q_y_eval],
                 feed_dict={self.s_img_: next_imgs,
@@ -239,9 +311,12 @@ class BaseBrain:
                            self.q_y_target: q_y_target,
                            self.ISWeights: ISWeights})
             self.memory.batch_update(tree_idx, abs_errors)  # update priority
-            self.writer.add_summary(summary=summary, global_step=self._global_step.eval())
+            self.writer.add_summary(summary=summary, global_step=self.learn_step_counter)
             self.learn_step_counter += 1
-            print("Train spent {:f}".format(time.time() * 1000 - start_time))
+            if self.learn_step_counter > 0 and self.learn_step_counter % 25 == 0:
+                print('\nSave weights {:d}\n'.format(self.learn_step_counter))
+                self.saver.save(self.sess, self.model_save_path, global_step=self.learn_step_counter)
+            print("Train spent {:d}  {:f}".format(self.learn_step_counter, time.time() * 1000 - start_time))
 
     def load_model(self, sess, saver):
         ckpt = tf.train.get_checkpoint_state("./checkpoints")
@@ -250,3 +325,11 @@ class BaseBrain:
             print('Restoring from {}...'.format(weight_path), end=' ')
             saver.restore(sess, weight_path)
             print('done')
+
+    def load_memory(self, root):
+        self.memory.load_memory(root)
+
+
+if __name__ == '__main__':
+    base_brain = BaseBrain(6, 7, 5, (192, 256, 3), 32)
+    base_brain.load_memory("../../vysor")

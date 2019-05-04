@@ -1,4 +1,7 @@
 import numpy as np
+import os
+import os.path as osp
+from tqdm import *
 
 
 class SumTree(object):
@@ -85,6 +88,10 @@ class Memory(object):  # stored as ( s, a, r, s_ ) in SumTree
 
     def __init__(self, capacity):
         self.tree = SumTree(capacity)
+        self.img_path_dict = {}
+        self.state_dict = {}
+        self.action_dict = {}
+        self.reward_dict = {}
 
     def store(self, transition):
         max_p = np.max(self.tree.tree[-self.tree.capacity:])
@@ -113,3 +120,122 @@ class Memory(object):  # stored as ( s, a, r, s_ ) in SumTree
         ps = np.power(clipped_errors, self.alpha)
         for ti, p in zip(tree_idx, ps):
             self.tree.update(ti, p)
+
+    def update_dict(self):
+        data = self.tree.data
+
+        keys = set()
+        for item in data:
+            if type(item) is not np.str:
+                continue
+            split = item.split("_")
+            if len(split) == 2:
+                game_id = split[0]
+                index = int(split[1])
+                for i in range(5):
+                    step = 0 if index + 5 - i * 5 < 0 else index + 5 - i * 5
+                    keys.add(game_id + "_" + str(step))
+
+        keys = list(keys)
+        self.state_dict = self._clear(self.state_dict, keys)
+        self.action_dict = self._clear(self.action_dict, keys)
+        self.reward_dict = self._clear(self.reward_dict, keys)
+        self.img_path_dict = self._clear(self.img_path_dict, keys)
+
+    @staticmethod
+    def _clear(dict_collection, keys):
+        c_keys = dict_collection.keys()
+        delete_keys = [key for key in c_keys if key not in keys]
+        for key in delete_keys:
+            dict_collection.pop(key)
+        return dict_collection
+
+    def load_memory(self, root):
+        self._load_fail_memory(osp.join(root, "fail"))
+        self._load_win_memory(osp.join(root, "win"))
+
+    def _load_fail_memory(self, root):
+        listdir = os.listdir(root)
+        for dir_name in tqdm(listdir, "load fail memory"):
+            game_id = int(dir_name)
+            dir_path = osp.join(root, dir_name)
+            self._parse_memory(dir_path, game_id)
+
+    def _load_win_memory(self, root):
+        listdir = os.listdir(root)
+        for dir_name in tqdm(listdir, desc="load win memory"):
+            game_id = int(dir_name)
+            dir_path = osp.join(root, dir_name)
+            self._parse_memory(dir_path, game_id)
+
+    def _parse_memory(self, root, game_id):
+        state_keys = self._parse_states(osp.join(root, "state.txt"), game_id)
+        reward_keys = self._parse_rewards(osp.join(root, "reward.txt"), game_id)
+        action_keys = self._parse_actions(osp.join(root, "action.txt"), game_id)
+        assert self._check_keys(state_keys, reward_keys, action_keys)
+        self._parse_imgs_path(osp.join(root, "running"), state_keys)
+        self._load_keys(state_keys)
+
+    def _load_keys(self, keys):
+        for key in keys:
+            self.store(key)
+
+    def _parse_states(self, path, game_id):
+        keys = []
+        with open(path, "r") as f:
+            lines = f.readlines()
+            for line in lines:
+                split = line.strip().split(":")
+                index = int(split[0])
+                state_str = split[1].split(",")
+                state = [float(item) for item in state_str]
+                key = str(game_id) + "_" + str(index)
+                self.state_dict[key] = state
+                keys.append(key)
+        return keys
+
+    def _parse_rewards(self, path, game_id):
+        keys = []
+        with open(path, "r") as f:
+            lines = f.readlines()
+            for line in lines:
+                split = line.strip().split(":")
+                index = int(split[0])
+                reward = float(split[1])
+                key = str(game_id) + "_" + str(index)
+                self.reward_dict[key] = reward
+                keys.append(key)
+        return keys
+
+    def _parse_actions(self, path, game_id):
+        keys = []
+        with open(path, "r") as f:
+            lines = f.readlines()
+            for line in lines:
+                split = line.strip().split(":")
+                index = int(split[0])
+                action_str = split[1].replace("[", "").replace("]", "").replace(" ", "").split(",")
+                action = [int(item) for item in action_str]
+                key = str(game_id) + "_" + str(index)
+                self.action_dict[key] = action
+                keys.append(key)
+        return keys
+
+    @staticmethod
+    def _check_keys(keys0, keys1, keys2):
+        if len(keys0) == len(keys1) == len(keys2):
+            for item in keys0:
+                if item not in keys1:
+                    return False
+                if item not in keys2:
+                    return False
+        return True
+
+    def _parse_imgs_path(self, root, keys):
+        for key in keys:
+            index = int(key.split("_")[-1])
+            indices = [index + 5, index, index - 5, index - 5 * 2, index - 5 * 3]
+            indices = [max(0, item) for item in indices]
+            indices = [min(item, len(keys) - 1) for item in indices]
+            img_paths = [osp.join(root, str(item) + ".jpg") for item in indices]
+            self.img_path_dict[key] = img_paths
