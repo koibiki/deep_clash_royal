@@ -29,6 +29,7 @@ class ClashRoyal:
         ll = ctypes.cdll.LoadLibrary
         self.root = root
         self.record = True
+        self.scale = True
         self.real_time = True
         self.game_start = False
         self.game_finish = False
@@ -38,13 +39,13 @@ class ClashRoyal:
         self.retry = 0
         self.loc_x_action_choices = [offset_w + x * w_gap + w_gap // 2 for x in range(num_align_width - 1)]
         self.loc_y_action_choices = [(y + 1) * h_gap + h_gap * 3 // 4 for y in range(num_align_height)]
-        self.card_choices = [[0, 0], [340, 1720], [560, 1702], [738, 1698], [938, 1718]]
+        self.card_choices = [[340, 1720], [560, 1702], [738, 1698], [938, 1718]]
         self.n_loc_x_actions = len(self.loc_x_action_choices)
         self.n_loc_y_actions = len(self.loc_y_action_choices)
-        self.n_card_actions = len(self.card_choices)
+        self.n_card_actions = 93  # 92 种牌 + empty
         self.img_shape = (256, 192, 3 * 4)
-        # 4个位置卡牌的 种类 是否可用 消耗圣水量 剩余圣水量 耗时 双倍圣水 即死 (我方血量 对方血量) 是否溅射 是否飞行 是非远程 是否spell 是否专对建筑
-        self.state_shape = len(card_dict.keys()) * 4 + 4 + 4 + 1 + 1 + 1 + 1 + 2 + 4 + 4 + 4 + 4 + 4
+        # 是否有92种card 92种card是否可用 92种card消耗圣水量 剩余圣水量 耗时 双倍圣水 即死 (我方血量 对方血量)
+        self.state_shape = 92 * 3 + 1 + 1 + 1 + 1 + 2
 
         self.memory_record = []
         self.rate_of_winning = []
@@ -84,8 +85,8 @@ class ClashRoyal:
         if self.game_start and result.frame_state == STATE_DICT["RUNNING_STATE"]:
             img_range = []
             for ii in range(4):
-                index = 0 if result.frame_index - ii * 5 < 0 else result.frame_index
-                img_range.append(self.imgs[index])
+                index = 0 if result.frame_index - ii * 5 < 0 else result.frame_index - ii * 5
+                img_range.append(self.imgs[index] / 255.)
 
             step_imgs = np.concatenate(img_range, axis=-1)
             observation = [result.frame_index, step_imgs, self.states[result.frame_index]]
@@ -133,8 +134,6 @@ class ClashRoyal:
         if result.mine_crown > self.pre_mine_crown:
             reward = 0.3
             self.pre_mine_crown = result.mine_crown
-        if self.record:
-            cv2.imwrite(osp.join(self.running_dir, "{:d}.jpg".format(result.frame_index)), img)
 
         if reward != 0:
             self._update_reward(reward, result.frame_index - 80, 70)
@@ -144,9 +143,16 @@ class ClashRoyal:
         state = parse_running_state(result)
 
         self.states[result.frame_index] = state
-        img_state = \
-            img[self.h_gap + self.h_gap // 4: 9 * self.h_gap + self.h_gap // 4, self.h_gap // 2:-self.h_gap // 2, :]
-        self.imgs[result.frame_index] = cv2.resize(img_state, (192, 256)) / 255.
+        img_state = img[self.h_gap // 2 + self.h_gap // 8: 9 * self.h_gap // 2 + self.h_gap // 8,
+                    self.h_gap // 4:-self.h_gap // 4, :]
+        self.imgs[result.frame_index] = cv2.resize(img_state, (192, 256))
+
+        if self.record:
+            img_path = osp.join(self.running_dir, "{:d}.jpg".format(result.frame_index))
+            if self.scale:
+                cv2.imwrite(img_path, self.imgs[result.frame_index])
+            else:
+                cv2.imwrite(img_path, img)
 
         return state
 
@@ -255,7 +261,6 @@ class ClashRoyal:
             self.actions[index] = [0, 0, 0]
 
     def _episode_statistics(self, result):
-
         skip_step = 10
         max_step = self.running_frame_count - skip_step
 
