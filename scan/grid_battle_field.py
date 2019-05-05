@@ -1,7 +1,4 @@
 import cv2
-import os
-import os.path as osp
-from tqdm import *
 
 num_align_width = 7
 num_align_height = 8

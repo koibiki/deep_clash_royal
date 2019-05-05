@@ -1,5 +1,7 @@
 import numpy as np
 
+CARD_TYPE = 93
+
 card_dict = {0: "empty", 1: "Furnace", 2: "GoblinBarrel", 3: "DarkPrince", 4: "Prince",
              5: "RoyalHogs", 6: "Giant", 7: "Arrows", 8: "FireSpirit", 9: "Bomber",
              10: "IceGolem", 11: "X-box", 12: "BarbarianHut", 13: "Witch",
