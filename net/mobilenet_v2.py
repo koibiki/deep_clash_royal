@@ -13,6 +13,4 @@ def build_mobilenetv2(_inputs, is_train):
         res8 = inverted_res_block(res7, 320, (3, 3), t=6, s=1, is_train=is_train, n=1, name='res8')
 
         conv9 = conv2d_block(res8, 512, 1, 1, is_train, name='conv9_1')
-        if is_train:
-            conv9 = slim.dropout(conv9, keep_prob=0.5, scope='dp')
     return conv9

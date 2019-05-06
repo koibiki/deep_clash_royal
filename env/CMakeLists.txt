@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.12)
-project(clash_royal_agent)
+project(env)
 
 set(CMAKE_CXX_STANDARD 14)
 
@@ -19,7 +19,7 @@ include_directories(./include)
 
 target_link_libraries(c_opencv ${OpenCV_LIBS})
 
-add_executable(clash_royal_agent main.cpp )
+add_executable(env main.cpp )
 
-target_link_libraries(clash_royal_agent c_opencv)
+target_link_libraries(env c_opencv)
 

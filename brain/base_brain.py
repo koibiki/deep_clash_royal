@@ -81,6 +81,14 @@ class BaseBrain:
             # out = resnet_v2.resnet_v2_50(s_img)[1][scope + "/cnn/resnet_v2_50/block4"]
             out = build_mobilenetv2(s_img, True)
 
+            loc = tf.layers.average_pooling2d(out, (2, 2), (2, 2), )
+
+            cnn_out = tf.layers.conv2d_transpose(loc, 512, (3, 3), (2, 2), padding="same")
+
+            cnn_concat = tf.concat([out, cnn_out], axis=-1)
+
+            cnn_concat = tf.layers.dropout(cnn_concat, 0.5)
+
         with tf.variable_scope('executor'):
             s_card_elixir = tf.cast(s_card_elixir, dtype=tf.float32)
             dense = tf.layers.dense(s_card_elixir, 512, kernel_regularizer=self.reg, activation=tf.nn.relu)
@@ -91,18 +99,16 @@ class BaseBrain:
             h_dense = tf.concat([dense for _ in range(out.shape[1].value)], axis=1)
             h_w_dense = tf.concat([h_dense for _ in range(out.shape[2].value)], axis=2)
 
-            concat = tf.concat([out, h_w_dense], axis=-1)
-
-            concat = tf.nn.dropout(concat, 0.5)
+            concat = tf.concat([cnn_concat, h_w_dense], axis=-1)
 
             with tf.variable_scope('value'):
-                play_value = tf.layers.conv2d(concat, 1, (1, 1), )
+                play_value = tf.layers.conv2d(concat, 1, (3, 3), (1, 1), padding="same")
 
-                card_value = tf.layers.conv2d(concat, 1, (1, 1), )
+                card_value = tf.layers.conv2d(concat, 1, (3, 3), (1, 1), padding="same")
 
             with tf.variable_scope('advantage'):
-                play_advantage = tf.layers.conv2d(concat, 2, (1, 1))
-                card_advantage = tf.layers.conv2d(concat, 92, (1, 1))
+                play_advantage = tf.layers.conv2d(concat, 2, (3, 3), (1, 1), padding="same")
+                card_advantage = tf.layers.conv2d(concat, 92, (3, 3), (1, 1), padding="same")
 
             with tf.variable_scope('q'):
                 # Q = V(s) + A(s,a)
@@ -191,7 +197,7 @@ class BaseBrain:
 
     def choose_action(self, observation):
         uniform = np.random.uniform()
-        if uniform <= 0.4:
+        if uniform <= 0.6:
             # forward feed the observation and get q value for every actions
             play_value, card_value = self.sess.run([self.q_play_eval, self.q_card_eval, ],
                                                    feed_dict={self.s_img: [observation[1]],
@@ -203,7 +209,7 @@ class BaseBrain:
             else:
                 action = [0, 0, 0]
             print("dqn choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]))
-        elif uniform < 0.6:
+        elif uniform < 0.8:
             card = random.choice(range(92 + 1))
             x_loc = random.choice(range(6))
             y_loc = random.choice(range(7))
@@ -348,5 +354,5 @@ class BaseBrain:
 
 
 if __name__ == '__main__':
-    base_brain = BaseBrain(6, 7, 5, (192, 256, 3), 32)
+    base_brain = BaseBrain(6, (192, 256, 3), 32)
     base_brain.load_memory("../../vysor")

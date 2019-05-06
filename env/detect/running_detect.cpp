@@ -20,11 +20,6 @@ RunningResult RunningDetect::detect_running(Mat &src, int frame_index) {
     int start_h = height / 4;
     int clip_h = height / 3;
 
-
-    char * ss = "ss";
-
-
-
     Rect opp_clip_rect(start_w, start_h, clip_w, clip_h / 2);
     Rect mine_clip_rect(start_w, start_h + clip_h / 2, clip_w, clip_h / 2);
 
