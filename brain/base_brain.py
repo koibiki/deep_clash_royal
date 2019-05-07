@@ -9,15 +9,19 @@ import tensorflow as tf
 from tensorflow.contrib.slim.python.slim.nets import resnet_v2
 
 from brain.memory import Memory
+from game.clash_royal import ClashRoyal
 from net.mobilenet_v2 import build_mobilenetv2
 from utils.img_utils import add_salt_and_pepper, add_gaussian_noise
 
 
 class BaseBrain:
+    BrainType = {"double": 0,
+                 "runner": 1,
+                 "trainer": 2}
+
     def __init__(self,
-                 n_card_actions,
-                 img_shape,
-                 state_shape,
+                 clash_royal,
+                 brain_type,
                  lr=0.0001,
                  reward_decay=0.9,
                  memory_size=50000,
@@ -25,9 +29,11 @@ class BaseBrain:
                  replace_target_iter=250, ):
         self.p = Pool(4)
         self.retry = 0
-        self.n_card_actions = n_card_actions
-        self.img_shape = img_shape
-        self.state_shape = state_shape
+        self.n_card_actions = clash_royal.n_card_actions
+        self.img_shape = clash_royal.img_shape
+        self.state_shape = clash_royal.state_shape
+
+        self.brain_type = brain_type
 
         self.rate_of_winning = 0
         self.reward_sum = 0
@@ -47,7 +53,7 @@ class BaseBrain:
         self.memory_size = memory_size
 
         sess_config = tf.ConfigProto()
-        sess_config.gpu_options.per_process_gpu_memory_fraction = 0.9
+        sess_config.gpu_options.per_process_gpu_memory_fraction = 0.4
         sess_config.gpu_options.allow_growth = True
 
         self.sess = tf.Session(config=sess_config)
@@ -71,7 +77,7 @@ class BaseBrain:
             self.sess.run(tf.global_variables_initializer())
             self.load_model(self.sess, self.saver)
 
-            self.writer = tf.summary.FileWriter("./logs/")
+            self.writer = tf.summary.FileWriter("./logs/" + clash_royal.name)
             self.writer.add_graph(self.sess.graph)
             self.merge_summary = tf.summary.merge_all()
 
@@ -126,9 +132,10 @@ class BaseBrain:
         self._rate_of_winning = tf.Variable(0.0, name='rate_of_winning', dtype=tf.float32, trainable=False)
         self._reward = tf.Variable(0.0, name='reward', dtype=tf.float32, trainable=False)
 
-        with tf.variable_scope('rate_of_winning'):
-            tf.summary.scalar(name='rate_of_winning', tensor=self._rate_of_winning)
-            tf.summary.scalar(name='reward_sum', tensor=self._reward)
+        if self.brain_type != self.BrainType["trainer"]:
+            with tf.variable_scope('rate_of_winning'):
+                tf.summary.scalar(name='rate_of_winning', tensor=self._rate_of_winning)
+                tf.summary.scalar(name='reward_sum', tensor=self._reward)
         # ------------------ build evaluate_net ------------------
         # input State
         self.s_img = \
@@ -161,9 +168,10 @@ class BaseBrain:
                 self.weights * (tf.squared_difference(self.q_card_target, self.q_card_eval) * eval_play * target_play))
 
             self.loss = card_loss + card_loss + reg_loss
-            tf.summary.scalar(name='loss', tensor=self.loss)
-            tf.summary.scalar(name='play_loss', tensor=play_loss)
-            tf.summary.scalar(name='card_loss', tensor=card_loss)
+            if self.brain_type != self.BrainType["runner"]:
+                tf.summary.scalar(name='loss', tensor=self.loss)
+                tf.summary.scalar(name='play_loss', tensor=play_loss)
+                tf.summary.scalar(name='card_loss', tensor=card_loss)
 
         with tf.variable_scope('train'):
             self._train_op = tf.train.RMSPropOptimizer(self.lr).minimize(self.loss, global_step=self._global_step)
@@ -289,6 +297,16 @@ class BaseBrain:
         card_action = [[card_type_action[i], x_action[i], y_action[i]] for i in range(len(card_type_action))]
         return imgs, states, card_action, reward, next_imgs, next_states
 
+    def record_battle_result(self):
+        with self.sess.as_default():
+            self.sess.run(tf.assign(self._rate_of_winning, self.rate_of_winning))
+            self.sess.run(tf.assign(self._reward, self.reward_sum))
+            summary = self.sess.run([self.merge_summary], )
+
+            self.writer.add_summary(summary=summary[0], global_step=self.learn_step_counter)
+
+            self.learn_step_counter += 1
+
     def learn(self):
         with self.sess.as_default():
             # check to replace target parameters
@@ -299,8 +317,9 @@ class BaseBrain:
             start_time = time.time() * 1000
             tree_idx, batch_memory, weights = self.memory.sample(self.batch_size)
 
-            self.sess.run(tf.assign(self._rate_of_winning, self.rate_of_winning))
-            self.sess.run(tf.assign(self._reward, self.reward_sum))
+            if self.brain_type != self.BrainType["trainer"]:
+                self.sess.run(tf.assign(self._rate_of_winning, self.rate_of_winning))
+                self.sess.run(tf.assign(self._reward, self.reward_sum))
 
             imgs, states, card_action, reward, next_imgs, next_states \
                 = self._prepare_data(batch_memory)
@@ -354,5 +373,6 @@ class BaseBrain:
 
 
 if __name__ == '__main__':
-    base_brain = BaseBrain(6, (192, 256, 3), 32)
+    royal = ClashRoyal("../")
+    base_brain = BaseBrain(royal, 0)
     base_brain.load_memory("../../vysor")

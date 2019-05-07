@@ -20,7 +20,7 @@ from utils.cmd_utils import execute_cmd
 
 class ClashRoyal:
 
-    def __init__(self, root):
+    def __init__(self, root, name="gamer0"):
         super().__init__()
         w = 1080
         num_align_width = 7
@@ -28,6 +28,7 @@ class ClashRoyal:
         self.w_gap = self.h_gap = w_gap = h_gap = w // num_align_width
         offset_w = w_gap // 2
         ll = ctypes.cdll.LoadLibrary
+        self.name = name
         self.root = root
         self.record = True
         self.scale = True

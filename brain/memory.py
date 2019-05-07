@@ -92,6 +92,7 @@ class Memory(object):  # stored as ( s, a, r, s_ ) in SumTree
         self.state_dict = {}
         self.action_dict = {}
         self.reward_dict = {}
+        self.memory_paths = []
 
     def store(self, transition):
         max_p = np.max(self.tree.tree[-self.tree.capacity:])
@@ -159,14 +160,18 @@ class Memory(object):  # stored as ( s, a, r, s_ ) in SumTree
         for dir_name in tqdm(listdir, "load fail memory"):
             game_id = int(dir_name)
             dir_path = osp.join(root, dir_name)
-            self._parse_memory(dir_path, game_id)
+            if dir_path not in self.memory_paths:
+                self.memory_paths.append(dir_path)
+                self._parse_memory(dir_path, game_id)
 
     def _load_win_memory(self, root):
         listdir = os.listdir(root)
         for dir_name in tqdm(listdir, desc="load win memory"):
             game_id = int(dir_name)
             dir_path = osp.join(root, dir_name)
-            self._parse_memory(dir_path, game_id)
+            if dir_path not in self.memory_paths:
+                self.memory_paths.append(dir_path)
+                self._parse_memory(dir_path, game_id)
 
     def _parse_memory(self, root, game_id):
         state_keys = self._parse_states(osp.join(root, "state.txt"), game_id)
