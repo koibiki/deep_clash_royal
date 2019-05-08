@@ -190,17 +190,17 @@ class ClashRoyal:
         if not self.game_start:
             self._init_game(int(time.time() * 1000))
 
-        if self.mode == self.MODE["battle"]:
+        if self.mode == self.MODE["battle"] and result.index == 2:
             if self.retry > 25 and self.retry % 50 == 0:
                 self.retry = 0
                 cmd = "adb -s {:s} shell input tap 344 1246".format(self.device_id)
                 self.p.apply_async(execute_cmd, args={cmd})
             self.retry += 1
-        elif self.mode == self.MODE["friend_battle_host"]:
+        elif self.mode == self.MODE["friend_battle_host"] and result.index == 3:
             if result.is_grey:
                 if self.retry > 25 and self.retry % 50 == 0:
                     self.retry = 0
-                    cmd = "adb  -s {:s} shell input tap 344 1246".format(self.device_id)
+                    cmd = "adb  -s {:s} shell input tap 522 530".format(self.device_id)
                     self.p.apply_async(execute_cmd, args={cmd})
                 self.retry += 1
             else:
@@ -212,7 +212,7 @@ class ClashRoyal:
                                                                              result.purple_loc[1])
                         self.p.apply_async(execute_cmd, args={cmd})
                     self.retry += 1
-        elif self.mode == self.MODE["friend_battle_guest"]:
+        elif self.mode == self.MODE["friend_battle_guest"] and result.index == 2:
             if not result.is_grey:
                 if result.yellow_loc[0] != 0:
                     if self.retry > 25 and self.retry % 50 == 0:
