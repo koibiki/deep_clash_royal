@@ -7,17 +7,17 @@ from utils.c_lib_utils import convert2pymat
 if __name__ == '__main__':
 
     # address = "http://127.0.0.1:35013/device/cd9faa7f/video.flv"
-    address = "http://127.0.0.1:35013/device/70a7da50/video.flv"
+    # address = "http://127.0.0.1:35013/device/70a7da50/video.flv"
     # address = "./scan/s1.mp4"
-    # address = "http://127.0.0.1:46539/device/cd9faa7f/video.flv"
+    address = "http://127.0.0.1:46539/device/cd9faa7f/video.flv"
     capture = cv2.VideoCapture(address)
 
     i = 0
 
-    # root = "/home/chengli/data/gym_data/clash_royal"
-    root = "/home/holaverse/work/07battle_filed/clash_royal"
+    root = "/home/chengli/data/gym_data/clash_royal"
+    # root = "/home/holaverse/work/07battle_filed/clash_royal"
 
-    clash_royal = ClashRoyal(root)
+    clash_royal = ClashRoyal(root, name="agent0")
 
     base_brain = BaseBrain(clash_royal,
                            BaseBrain.BrainType["runner"], )
@@ -44,6 +44,7 @@ if __name__ == '__main__':
             if clash_royal.game_start and clash_royal.game_finish and clash_royal.retry <= 1:
                 base_brain.update_episode_result(clash_royal.get_rate_of_winning())
                 base_brain.record_battle_result()
+                base_brain.load_model()
 
         else:
             print("没有信号..")

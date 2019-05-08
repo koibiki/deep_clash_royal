@@ -75,7 +75,7 @@ class BaseBrain:
             self.model_save_path = osp.join("./checkpoints", model_name)
 
             self.sess.run(tf.global_variables_initializer())
-            self.load_model(self.sess, self.saver)
+            self.load_model()
 
             self.writer = tf.summary.FileWriter("./logs/" + clash_royal.name)
             self.writer.add_graph(self.sess.graph)
@@ -360,12 +360,12 @@ class BaseBrain:
                 self.saver.save(self.sess, self.model_save_path, global_step=self.learn_step_counter)
             print("Train spent {:d}  {:f}".format(self.learn_step_counter, time.time() * 1000 - start_time))
 
-    def load_model(self, sess, saver):
+    def load_model(self):
         ckpt = tf.train.get_checkpoint_state("./checkpoints")
         if ckpt is not None:
             weight_path = ckpt.model_checkpoint_path
             print('Restoring from {}...'.format(weight_path), end=' ')
-            saver.restore(sess, weight_path)
+            self.saver.restore(self.sess, weight_path)
             print('done')
 
     def load_memory(self, root):

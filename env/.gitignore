@@ -9,3 +9,4 @@ models
 logs/
 cmake-build-debug/
 cmake-build-release/
+build/
