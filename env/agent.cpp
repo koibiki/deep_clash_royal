@@ -26,6 +26,14 @@ result ClashRoyalAgent::detect_mat(Mat src, result r) {
         if (menuResult.inGame) {
             r.frame_state = MENU_STATE;
             r.index = menuResult.index;
+            r.is_grey = menuResult.isGrey;
+            if (r.index == 3 && !r.is_grey) {
+                const ButtonResult &buttonResult = buttonDetect.detect_button(src, frame_index);
+                r.purple_loc[0] = buttonResult.purple_button_loc[0];
+                r.purple_loc[1] = buttonResult.purple_button_loc[1];
+                r.yellow_loc[0] = buttonResult.yellow_button_loc[0];
+                r.yellow_loc[1] = buttonResult.yellow_button_loc[1];
+            }
         } else {
             RunningResult runningResult = runningDetect.detect_running(src, frame_index);
             if (runningResult.isRunning) {
@@ -49,7 +57,7 @@ result ClashRoyalAgent::detect_mat(Mat src, result r) {
                     r.prob[i] = cardResult.prob;
                 }
 
-                r.remain_elixir = eilxirDetect.detect_elixir(src);
+                r.remain_elixir = elixirDetect.detect_elixir(src);
 
             } else {
                 FinishResult finishResult = finishDetect.detect_finish(src, frame_index);
@@ -83,7 +91,7 @@ result ClashRoyalAgent::detect_mat(Mat src, result r) {
                 }
                 r.prob[i] = cardResult.prob;
             }
-            r.remain_elixir = eilxirDetect.detect_elixir(src);
+            r.remain_elixir = elixirDetect.detect_elixir(src);
         } else {
             FinishResult finishResult = finishDetect.detect_finish(src, frame_index);
             if (finishResult.is_finish) {
@@ -122,7 +130,7 @@ void ClashRoyalAgent::init_agent(int gameId) {
     this->currentGameState = MENU_STATE;
     this->gameId = gameId;
     this->cardDetect.reset();
-    this->eilxirDetect.reset();
+    this->elixirDetect.reset();
     for (int i = 0; i < 4; i++) {
         this->pre_type[i] = 0;
     }

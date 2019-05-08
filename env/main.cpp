@@ -15,10 +15,27 @@ int main() {
 
     ElixirDetect elixirDetect;
 
-    Mat img = cv::imread("./147.jpg");
-    cv::resize(img, img, cv::Size(540, 960));
-    finishDetect.detect_finish(img, 0);
-    int result = elixirDetect.detect_elixir(img);
+    Menu menu;
+
+    ButtonDetect buttonDetect;
+
+    Mat img = cv::imread("../2050448982.jpg");
+
+    const ButtonResult &buttonResult = buttonDetect.detect_button(img, 0);
+
+    cv::Scalar color(0, 0, 255);
+    cv::circle(img, cv::Point(buttonResult.purple_button_loc[0], buttonResult.purple_button_loc[1]), 3, color, 10);
+    cv::circle(img, cv::Point(buttonResult.yellow_button_loc[0], buttonResult.yellow_button_loc[1]), 3, color, 10);
+
+
+    cv::resize(img, img, cv::Size(), 0.5, 0.5);
+
+    cv::imshow("ss", img);
+
+    cv::waitKey(0);
+    const MenuResult &menuResult = menu.detect_tap_location(img, 0);
+
+    cout << menuResult.isGrey << endl;
 
 
     VideoCapture cap;

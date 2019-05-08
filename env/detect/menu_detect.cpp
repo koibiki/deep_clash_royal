@@ -8,10 +8,11 @@
 static int CHECK_NUM = 0;
 static int RECT_HEIGHT = -1;
 
-static const int BACK_THRESH[2][3][2]{
+static const int BACK_THRESH[3][3][2]{
         // normal
         {{135, 185}, {100, 145}, {75,  100}},
         {{65,  135}, {165, 240}, {190, 255}},
+        {{40,  80},  {40,  70},  {25,  50}}
 };
 
 
@@ -39,7 +40,7 @@ struct MenuResult Menu::detect_tap_location(Mat &mat, int frame_index) {
 
     bool inGame = false;
     int colorIndex = 0;
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 3; i++) {
         colorIndex = i;
         detect_tap_by_color(scale_mat, possible_rects, scale_width, scale_height, i);
         inGame = is_in_game(possible_rects, scale_width, i);

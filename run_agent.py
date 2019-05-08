@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     root = "../vysor/"
 
-    clash_royal = ClashRoyal(root)
+    clash_royal = ClashRoyal(root, "cd123b7e")
 
     while True:
         i += 1
@@ -27,7 +27,6 @@ if __name__ == '__main__':
             #     continue
             # else:
             #     i = 0
-            img = img[75:, :, :]
             img = cv2.resize(img, (540, 960))
 
             pymat = convert2pymat(img)

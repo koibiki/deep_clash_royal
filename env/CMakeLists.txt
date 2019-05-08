@@ -13,13 +13,15 @@ add_library(c_opencv SHARED
         detect/running_detect.cpp
         detect/menu_detect.cpp
         detect/start_detect.cpp
+        detect/button_detect.cpp
         dnn/elixir_detect.cpp
-        dnn/card_detect.cpp)
+        dnn/card_detect.cpp
+        )
 include_directories(./include)
 
 target_link_libraries(c_opencv ${OpenCV_LIBS})
 
-add_executable(env main.cpp )
+add_executable(env main.cpp)
 
 target_link_libraries(env c_opencv)
 

@@ -19,8 +19,11 @@ from utils.cmd_utils import execute_cmd
 
 
 class ClashRoyal:
+    MODE = {"battle": 0,
+            "friend_battle_host": 1,
+            "friend_battle_guest": 2}
 
-    def __init__(self, root, name="gamer0"):
+    def __init__(self, root, device_id, mode=MODE["battle"], name="gamer0"):
         super().__init__()
         w = 1080
         num_align_width = 7
@@ -28,6 +31,8 @@ class ClashRoyal:
         self.w_gap = self.h_gap = w_gap = h_gap = w // num_align_width
         offset_w = w_gap // 2
         ll = ctypes.cdll.LoadLibrary
+        self.device_id = device_id
+        self.mode = mode
         self.name = name
         self.root = root
         self.record = True
@@ -184,11 +189,39 @@ class ClashRoyal:
             self.game_finish = False
         if not self.game_start:
             self._init_game(int(time.time() * 1000))
-        if self.retry > 25 and self.retry % 50 == 0:
-            self.retry = 0
-            cmd = "adb shell input tap 344 1246"
-            self.p.apply_async(execute_cmd, args={cmd})
-        self.retry += 1
+
+        if self.mode == self.MODE["battle"]:
+            if self.retry > 25 and self.retry % 50 == 0:
+                self.retry = 0
+                cmd = "adb -s {:s} shell input tap 344 1246".format(self.device_id)
+                self.p.apply_async(execute_cmd, args={cmd})
+            self.retry += 1
+        elif self.mode == self.MODE["friend_battle_host"]:
+            if result.is_grey:
+                if self.retry > 25 and self.retry % 50 == 0:
+                    self.retry = 0
+                    cmd = "adb  -s {:s} shell input tap 344 1246".format(self.device_id)
+                    self.p.apply_async(execute_cmd, args={cmd})
+                self.retry += 1
+            else:
+                if result.purple_loc[0] != 0:
+                    if self.retry > 25 and self.retry % 50 == 0:
+                        self.retry = 0
+                        cmd = "adb -s {:s} shell input tap {:d} {:d}".format(self.device_id,
+                                                                             result.purple_loc[0],
+                                                                             result.purple_loc[1])
+                        self.p.apply_async(execute_cmd, args={cmd})
+                    self.retry += 1
+        elif self.mode == self.MODE["friend_battle_guest"]:
+            if not result.is_grey:
+                if result.yellow_loc[0] != 0:
+                    if self.retry > 25 and self.retry % 50 == 0:
+                        self.retry = 0
+                        cmd = "adb -s {:s} shell input tap {:d} {:d}".format(self.device_id,
+                                                                             result.yellow_loc[0],
+                                                                             result.yellow_loc[1])
+                        self.p.apply_async(execute_cmd, args={cmd})
+                    self.retry += 1
 
     def _record_reward(self, result, img):
         if self.game_start and not self.game_finish:
@@ -242,7 +275,7 @@ class ClashRoyal:
     def _finish_game(self):
         if self.retry % 50 == 0:
             self.retry = 0
-            cmd = "adb shell input tap 536 1684"
+            cmd = "adb -s {:s} shell input tap 536 1684".format(self.device_id)
             self.p.apply_async(execute_cmd, args={cmd})
         self.retry += 1
 
@@ -269,7 +302,11 @@ class ClashRoyal:
                     loc_x = self.loc_y_action_choices[action[1]]
                     loc_y = self.loc_y_action_choices[action[2]]
                     if self.real_time:
-                        cmd = "adb shell input swipe {:d} {:d} {:d} {:d} 300".format(card[0], card[1], loc_x, loc_y)
+                        cmd = "adb -s {:s} shell input swipe {:d} {:d} {:d} {:d} 300".format(self.device_id,
+                                                                                             card[0],
+                                                                                             card[1],
+                                                                                             loc_x,
+                                                                                             loc_y)
                         self.p.apply_async(execute_cmd, args={cmd})
             else:
                 self._update_reward(-0.01, index, 1)

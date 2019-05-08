@@ -14,6 +14,7 @@
 #include "detect/menu_detect.h"
 #include "detect/finish_detect.h"
 #include "detect/start_detect.h"
+#include "detect/button_detect.h"
 #include "dnn/elixir_detect.h"
 #include "dnn/card_detect.h"
 
@@ -37,6 +38,9 @@ typedef struct Result {
     int game_state = MENU_STATE;
     int frame_state = ERROR_STATE;
     int index = -1;
+    bool is_grey = false;
+    int purple_loc[2] = {0, 0};
+    int yellow_loc[2] = {0, 0};
     int opp_crown = 0;
     int mine_crown = 0;
     int card_type[4] = {0, 0, 0, 0};
@@ -61,11 +65,13 @@ private:
 
     FinishDetect finishDetect;
 
-    ElixirDetect eilxirDetect;
+    ElixirDetect elixirDetect;
 
     CardDetect cardDetect;
 
     Menu menu;
+
+    ButtonDetect buttonDetect;
 
     int currentGameState = MENU_STATE;
 

@@ -2,7 +2,7 @@ import cv2
 import os.path as osp
 import os
 
-capture = cv2.VideoCapture("../s2.mp4")
+capture = cv2.VideoCapture("../s3.mp4")
 
 capture.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
@@ -32,10 +32,10 @@ while True:
         cv2.imshow("3", img3)
         cv2.waitKey(10)
 
-        cv2.imwrite("../../card/s2/0/S1_" + str(i * 4) + ".jpg", img0)
-        cv2.imwrite("../../card/s2/1/S2_" + str(i * 4 + 1) + ".jpg", img1)
-        cv2.imwrite("../../card/s2/2/S3_" + str(i * 4 + 2) + ".jpg", img2)
-        cv2.imwrite("../../card/s2/3/S4_" + str(i * 4 + 3) + ".jpg", img3)
+        cv2.imwrite("../../card/s3/0/S3_" + str(i * 4) + ".jpg", img0)
+        cv2.imwrite("../../card/s3/1/S3_" + str(i * 4 + 1) + ".jpg", img1)
+        cv2.imwrite("../../card/s3/2/S3_" + str(i * 4 + 2) + ".jpg", img2)
+        cv2.imwrite("../../card/s3/3/S3_" + str(i * 4 + 3) + ".jpg", img3)
 
         i += 1
     else:
