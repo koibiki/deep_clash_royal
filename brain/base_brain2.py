@@ -29,7 +29,7 @@ class BaseBrain:
                  replace_target_iter=250, ):
         self.p = Pool(4)
         self.retry = 0
-        self.n_card_actions = clash_royal.n_card_actions
+        self.n_card_actions = clash_royal.n_card_actions + 6 * 8
         self.img_shape = clash_royal.img_shape
         self.state_shape = clash_royal.state_shape
 
@@ -108,23 +108,17 @@ class BaseBrain:
             concat = tf.concat([cnn_concat, h_w_dense], axis=-1)
 
             with tf.variable_scope('value'):
-                play_value = tf.layers.conv2d(concat, 1, (3, 3), (1, 1), padding="same")
-
                 card_value = tf.layers.conv2d(concat, 1, (3, 3), (1, 1), padding="same")
 
             with tf.variable_scope('advantage'):
-                play_advantage = tf.layers.conv2d(concat, 2, (3, 3), (1, 1), padding="same")
-                card_advantage = tf.layers.conv2d(concat, 92, (3, 3), (1, 1), padding="same")
+                card_advantage = tf.layers.conv2d(concat, 93, (3, 3), (1, 1), padding="same")
 
             with tf.variable_scope('q'):
                 # Q = V(s) + A(s,a)
-                play_logit = play_value + (play_advantage - tf.reduce_mean(play_advantage, axis=-1, keepdims=True))
-                play_logit = tf.layers.average_pooling2d(play_logit, (play_logit.shape[1], play_logit.shape[2]), 1)
-                play_logit = tf.squeeze(play_logit, axis=[1, 2])
                 card_logit = card_value + (card_advantage - tf.reduce_mean(card_advantage, axis=-1, keepdims=True))
                 card_logit = tf.layers.flatten(card_logit)
 
-        return play_logit, card_logit
+        return card_logit
 
     def _build_evaluate_and_target_net(self):
 
@@ -142,35 +136,23 @@ class BaseBrain:
             tf.placeholder(tf.float32, [None, self.img_shape[0], self.img_shape[1], self.img_shape[2]], name='image')
         self.s_card_elixir = tf.placeholder(tf.float32, [None, self.state_shape], name='state')
 
-        self.q_play_target = tf.placeholder(tf.float32, [None, 2], name='Q_play_target')
         self.q_card_target = tf.placeholder(tf.float32, [None, self.n_card_actions], name='Q_card_target')
 
         self.weights = tf.placeholder(tf.float32, [None, 1], name='IS_weights')
 
         with tf.variable_scope('eval_net'):
-            self.q_play_eval, self.q_card_eval = self._build_net(self.s_img, self.s_card_elixir, )
+            self.q_card_eval = self._build_net(self.s_img, self.s_card_elixir, )
 
         with tf.variable_scope('loss'):
             reg_loss = tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
 
-            self.abs_errors = tf.reduce_sum(tf.abs(self.q_play_target - self.q_play_eval), axis=1) + \
-                              tf.reduce_sum(tf.abs(self.q_card_target - self.q_card_eval), axis=1)
+            self.abs_errors = tf.reduce_sum(tf.abs(self.q_card_target - self.q_card_eval), axis=1)
 
-            play_loss = tf.reduce_mean(self.weights * tf.squared_difference(self.q_play_target, self.q_play_eval))
+            card_loss = tf.reduce_mean(self.weights * (tf.squared_difference(self.q_card_target, self.q_card_eval)))
 
-            eval_play = tf.equal(1, tf.argmax(self.q_play_eval, axis=-1, output_type=tf.int32))
-            eval_play = tf.expand_dims(tf.cast(eval_play, dtype=tf.float32), axis=-1)
-
-            target_play = tf.equal(1, tf.argmax(self.q_play_target, axis=-1, output_type=tf.int32))
-            target_play = tf.expand_dims(tf.cast(target_play, dtype=tf.float32), axis=-1)
-
-            card_loss = tf.reduce_mean(
-                self.weights * (tf.squared_difference(self.q_card_target, self.q_card_eval) * eval_play * target_play))
-
-            self.loss = play_loss + card_loss + reg_loss
+            self.loss = card_loss + reg_loss
             if self.brain_type != self.BrainType["runner"]:
                 tf.summary.scalar(name='loss', tensor=self.loss)
-                tf.summary.scalar(name='play_loss', tensor=play_loss)
                 tf.summary.scalar(name='card_loss', tensor=card_loss)
 
         with tf.variable_scope('train'):
@@ -183,7 +165,7 @@ class BaseBrain:
         self.s_card_elixir_ = tf.placeholder(tf.float32, [None, self.state_shape], name='state_')
 
         with tf.variable_scope('target_net'):
-            self.q_play_next, self.q_card_next = self._build_net(self.s_img_, self.s_card_elixir_, )
+            self.q_card_next = self._build_net(self.s_img_, self.s_card_elixir_, )
 
     def store_transition(self, episode_record):
         game_id = episode_record[0]
@@ -205,24 +187,18 @@ class BaseBrain:
 
     def choose_action(self, observation):
         uniform = np.random.uniform()
-        if uniform <= 0.6:
+        if uniform <= 0.9:
             # forward feed the observation and get q value for every actions
-            play_value, card_value = self.sess.run([self.q_play_eval, self.q_card_eval, ],
-                                                   feed_dict={self.s_img: [observation[1]],
-                                                              self.s_card_elixir: [observation[2]]})
-            print("dqn play:" + str(np.argmax(play_value)) + "  " + str(play_value))
-            if np.argmax(play_value, axis=-1) == 1:
-                card_loc = np.argmax(card_value)
-                action = [card_loc % 92 + 1, card_loc % (92 * 6) // 92, card_loc // (92 * 6)]
+            card_value = self.sess.run([self.q_card_eval],
+                                       feed_dict={self.s_img: [observation[1]],
+                                                  self.s_card_elixir: [observation[2]]})[0]
+            index = np.argmax(card_value)
+            print("dqn play:" + str(index % 93 == 0))
+            if index % 93 != 0:
+                action = [index % 93, index % (93 * 6) // 93, index // (93 * 6)]
             else:
                 action = [0, 0, 0]
             print("dqn choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]))
-        elif uniform < 0.8:
-            card = random.choice(range(92 + 1))
-            x_loc = random.choice(range(6))
-            y_loc = random.choice(range(7))
-            action = [card, x_loc, y_loc]
-            print("random choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]))
         else:
             card = random.choice(observation[3])
             x_loc = random.choice(range(6))
@@ -324,33 +300,28 @@ class BaseBrain:
             imgs, states, card_action, reward, next_imgs, next_states \
                 = self._prepare_data(batch_memory)
 
-            q_card_next, q_play_next, q_card_eval, q_play_eval = self.sess.run(
-                [self.q_card_next, self.q_play_next, self.q_card_eval, self.q_play_eval],
+            q_card_next, q_card_eval, = self.sess.run(
+                [self.q_card_next, self.q_card_eval],
                 feed_dict={self.s_img_: next_imgs,
                            self.s_card_elixir_: next_states,
                            self.s_img: imgs,
                            self.s_card_elixir: states})
 
             q_card_target = q_card_eval.copy()
-            q_play_target = q_play_eval.copy()
-
-            play_action = [min(1, action[0]) for action in card_action]
-
-            card_action = [action[0] - 1 + 92 * (action[2] * 6 + action[1]) for action in card_action]
-
-            # q_play_target[:, play_action] = reward + self.gamma * np.max(q_play_next, axis=1)
-
-            for i in range(len(q_play_target)):
-                q_play_target[i, play_action[i]] = reward[i] + self.gamma * np.max(q_play_next[i])
 
             for i in range(len(q_card_target)):
-                q_card_target[:, card_action[i]] = reward[i] + self.gamma * np.max(q_card_next[i])
+                if card_action[i][0] != 0:
+                    action = card_action[i]
+                    index = action[0] + 93 * (action[2] * 6 + action[1])
+                    q_card_target[:, index] = reward[i] + self.gamma * np.max(q_card_next[i])
+                else:
+                    for ii in range(6 * 8):
+                        q_card_target[:, ii * 93] = reward[i] + self.gamma * np.max(q_card_next[i])
 
             _, abs_errors, loss, summary = self.sess.run(
                 [self._train_op, self.abs_errors, self.loss, self.merge_summary],
                 feed_dict={self.s_img: imgs,
                            self.s_card_elixir: states,
-                           self.q_play_target: q_play_target,
                            self.q_card_target: q_card_target,
                            self.weights: weights})
 

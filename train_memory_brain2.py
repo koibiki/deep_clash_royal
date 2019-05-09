@@ -1,4 +1,4 @@
-from brain.base_brain import BaseBrain
+from brain.base_brain2 import BaseBrain
 from game.clash_royal import ClashRoyal
 
 # root = "/home/chengli/data/gym_data/clash_royal"

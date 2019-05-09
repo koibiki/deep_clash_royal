@@ -1,6 +1,6 @@
 import cv2
 import time
-from brain.base_brain import BaseBrain
+from brain.base_brain2 import BaseBrain
 from game.clash_royal import ClashRoyal
 from utils.c_lib_utils import convert2pymat
 
