@@ -5,7 +5,6 @@
 #include "card_detect.h"
 
 CardDetect::CardDetect() {
-    this->load_dict();
     string mode_path = "./asset/card_net.pb";
     this->load_model(mode_path);
 }
@@ -35,7 +34,6 @@ CardResult CardDetect::predict(Mat &src) {
     CardResult result;
     result.card_type = type;
     result.available = available;
-    result.card_name = this->char_dict[to_string(type).data()].GetString();
     result.prob = ((float *) outputs[0].data)[type];
     return result;
 }
@@ -51,18 +49,6 @@ int CardDetect::argmax(Mat &src) {
         }
     }
     return max_index;
-}
-
-void CardDetect::load_dict() {
-    this->char_dict.Parse(this->card_dict_json);
-
-    if (debug) {
-        rapidjson::StringBuffer buffer;
-        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-        this->char_dict.Accept(writer);
-
-        std::cout << buffer.GetString() << std::endl;
-    }
 }
 
 void CardDetect::reset() {

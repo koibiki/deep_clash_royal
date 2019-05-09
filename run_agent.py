@@ -7,8 +7,8 @@ if __name__ == '__main__':
 
     # address = "http://127.0.0.1:35013/device/cd9faa7f/video.flv"
     # address = "./scan/s1.mp4"
-    # address = "http://127.0.0.1:46539/device/cd9faa7f/video.flv"
-    address = 'http://127.0.0.1:35013/device/cd123b7e/video.flv'
+    address = "http://127.0.0.1:35013/device/cd9faa7f/video.flv"
+    # address = 'http://127.0.0.1:35013/device/cd123b7e/video.flv'
     capture = cv2.VideoCapture(address)
     cv2.namedWindow('image')
 
@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     root = "../vysor/"
 
-    clash_royal = ClashRoyal(root, "cd123b7e")
+    clash_royal = ClashRoyal(root, "cd9faa7f")
 
     while True:
         i += 1

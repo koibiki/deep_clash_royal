@@ -11,10 +11,30 @@ FinishResult FinishDetect::detect_finish(cv::Mat &src, int frame_index) {
     cv::resize(src, resize_src, cv::Size(540 / 2, 960 / 2));
     bool finishPage = has_finish_button(resize_src);
 
+
     FinishResult result = FinishResult();
     result.is_finish = finishPage;
     if (finishPage) {
-        result.battle_win = is_win_finish(resize_src);
+
+        int w = resize_src.size[1];
+        int h = resize_src.size[0];
+        Rect mine(w / 3, int(0.38 * h), w / 3, int(0.04 * h));
+        Rect opp(w / 3, int(0.09 * h), w / 3, int(0.04 * h));
+
+        Mat mine_mat = resize_src(mine);
+        Mat opp_mat = resize_src(opp);
+
+        bool win = has_winner(mine_mat, 3);
+        bool lose = has_winner(opp_mat, 4);
+
+        if (win && !lose) {
+            result.battle_win = true;
+        } else if (!win && lose) {
+            result.battle_win = false;
+        } else {
+            result.battle_win = is_win_finish(resize_src);
+        }
+
     }
     return result;
 }
@@ -44,14 +64,14 @@ bool FinishDetect::has_finish_button(Mat &src) {
 
     Mat binary_mat = process_img(clip_mat, 0);
 
-    vector<Rect> possible_rects;
+    vector <Rect> possible_rects;
 
-    vector<vector<Point> > contours;
+    vector <vector<Point>> contours;
 
     findContours(binary_mat, contours, cv::RETR_CCOMP, cv::CHAIN_APPROX_SIMPLE);
 
     for (int i = 0; i < contours.size(); i++) {
-        vector<Point> points = contours[i];
+        vector <Point> points = contours[i];
         RotatedRect rect = minAreaRect(points);
 
         Rect possible_rect = rect.boundingRect();
@@ -68,6 +88,44 @@ bool FinishDetect::has_finish_button(Mat &src) {
     }
     return possible_rects.size() == 1;
 
+}
+
+bool FinishDetect::has_winner(Mat &src, int color_index) {
+
+    Mat resize;
+
+    cv::resize(src, resize, cv::Size(), 0.3, 0.3);
+
+    int w = src.size[1];
+    int h = src.size[0];
+
+
+    Mat binary = process_img(src, color_index);
+
+    vector <Rect> possible_rects;
+
+    vector <vector<Point>> contours;
+
+    findContours(binary, contours, cv::RETR_CCOMP, cv::CHAIN_APPROX_SIMPLE);
+
+    for (int i = 0; i < contours.size(); i++) {
+        vector <Point> points = contours[i];
+        RotatedRect rect = minAreaRect(points);
+
+        Rect possible_rect = rect.boundingRect();
+        if (possible_rect.x * 1.0f / w < 0.3 &&
+            (possible_rect.x + possible_rect.width) * 1.0f / w > 0.7 &&
+            possible_rect.width * 1.0f / w > 0.6 &&
+            possible_rect.y * 1.0f / h < 0.5 &&
+            (possible_rect.y + possible_rect.height) * 1.0f / h > 0.75 &&
+            possible_rect.height * 1.0f / h > 0.4) {
+
+            possible_rects.push_back(possible_rect);
+
+        }
+    }
+
+    return possible_rects.size() == 1;
 }
 
 bool FinishDetect::is_win_finish(Mat &src) {
@@ -89,14 +147,14 @@ bool FinishDetect::is_win_finish(Mat &src) {
 
     Mat golden_binary = process_img(golden_mat, 1);
 
-    vector<Rect> possible_rects;
+    vector <Rect> possible_rects;
 
-    vector<vector<Point> > contours;
+    vector <vector<Point>> contours;
 
     findContours(golden_binary, contours, cv::RETR_CCOMP, cv::CHAIN_APPROX_SIMPLE);
 
     for (int i = 0; i < contours.size(); i++) {
-        vector<Point> points = contours[i];
+        vector <Point> points = contours[i];
         RotatedRect rect = minAreaRect(points);
 
         Rect possible_rect = rect.boundingRect();

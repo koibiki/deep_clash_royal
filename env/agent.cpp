@@ -62,10 +62,14 @@ result ClashRoyalAgent::detect_mat(Mat src, result r) {
             } else {
                 FinishResult finishResult = finishDetect.detect_finish(src, frame_index);
                 if (finishResult.is_finish) {
+                    finish_count++;
+                }
+                if (finishResult.is_finish && finish_count > 5) {
                     currentGameState = MENU_STATE;
                     r.frame_state = FINISH_STATE;
                     r.win = finishResult.battle_win;
                     r.frame_index = frame_index++;
+
                 } else {
                     r.frame_state = ERROR_STATE;
                 }
@@ -95,6 +99,9 @@ result ClashRoyalAgent::detect_mat(Mat src, result r) {
         } else {
             FinishResult finishResult = finishDetect.detect_finish(src, frame_index);
             if (finishResult.is_finish) {
+                finish_count++;
+            }
+            if (finishResult.is_finish && finish_count > 5) {
                 currentGameState = MENU_STATE;
                 r.frame_state = FINISH_STATE;
                 r.win = finishResult.battle_win;
@@ -134,6 +141,7 @@ void ClashRoyalAgent::init_agent(int gameId) {
     for (int i = 0; i < 4; i++) {
         this->pre_type[i] = 0;
     }
+    this->finish_count = 0;
 }
 
 

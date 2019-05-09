@@ -98,6 +98,8 @@ private:
 
     int start_time;
 
+    int finish_count = 0;
+
 public:
 
     ClashRoyalAgent();

@@ -35,7 +35,7 @@ if __name__ == '__main__':
                 height = y - iy
                 if abs(width) <= 5 and abs(height) <= 5:
                     print(" i = {:d} tap point:={:d}, {:d}".format(i, x, y))
-                    shell_cmd = "adb shell input tap {:d} {:d} ".format(x * 2, y * 2)
+                    shell_cmd = "adb -s cd9faa7f shell input tap {:d} {:d} ".format(x * 2, y * 2)
                     p = Process(target=execute_command, args=(shell_cmd,))
                     p.start()
 
@@ -67,7 +67,7 @@ if __name__ == '__main__':
             # result = clash_royal.frame_step(img)
 
             cv2.imshow('image', img)
-            cv2.waitKey(1)
+            cv2.imwrite("ss.jpg", img)
 
         else:
             break

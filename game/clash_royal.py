@@ -122,7 +122,7 @@ class ClashRoyal:
         if not self.game_start:
             return
         if self.log:
-            print("error   spent:" + str(result.milli))
+            print("{:s} error   spent:{:f}".format(self.device_id, result.milli))
         if self.record:
             cv2.imwrite(osp.join(self.error_dir, "{:d}.jpg".format(self.frame_count)), img)
 
@@ -131,7 +131,7 @@ class ClashRoyal:
         if not self.game_start:
             return
         if self.log:
-            print("id:" + str(self.game_id) + "  running:" + str(result.frame_index) + "  " + str(
+            print(str(self.device_id) + "  running:" + str(result.frame_index) + "  " + str(
                 self.running_frame_count) + "  elixir:" + str(result.remain_elixir) + "  spent:" + str(result.milli))
 
             print("{:s}:{:f}-{:s}:{:f}-{:s}:{:f}-{:s}:{:f}".format(CARD_DICT[result.card_type[0]],
@@ -183,7 +183,8 @@ class ClashRoyal:
 
     def _action_on_hall(self, result):
         if self.log:
-            print("game in hall:" + str(result.index) + "  spent:" + str(result.milli))
+            print(
+                "game in hall:" + str(result.index) + " grey:" + str(result.is_grey) + "  spent:" + str(result.milli))
         if self.game_start and self.game_finish:
             self.game_start = False
             self.game_finish = False
@@ -191,37 +192,38 @@ class ClashRoyal:
             self._init_game(int(time.time() * 1000))
 
         if self.mode == self.MODE["battle"] and result.index == 2:
-            if self.retry > 25 and self.retry % 50 == 0:
+            if self.retry > 25 and self.retry % 10 == 0:
                 self.retry = 0
                 cmd = "adb -s {:s} shell input tap 344 1246".format(self.device_id)
                 self.p.apply_async(execute_cmd, args={cmd})
-            self.retry += 1
+
         elif self.mode == self.MODE["friend_battle_host"] and result.index == 3:
             if result.is_grey:
-                if self.retry > 25 and self.retry % 50 == 0:
+                if self.retry > 0 and self.retry % 5 == 0:
                     self.retry = 0
-                    cmd = "adb  -s {:s} shell input tap 522 530".format(self.device_id)
+                    # normal 548 544     548 944
+                    cmd = "adb  -s {:s} shell input tap 548 944".format(self.device_id)
                     self.p.apply_async(execute_cmd, args={cmd})
-                self.retry += 1
+
             else:
                 if result.purple_loc[0] != 0:
-                    if self.retry > 25 and self.retry % 50 == 0:
+                    if self.retry > 0 and self.retry % 5 == 0:
                         self.retry = 0
                         cmd = "adb -s {:s} shell input tap {:d} {:d}".format(self.device_id,
                                                                              result.purple_loc[0],
                                                                              result.purple_loc[1])
                         self.p.apply_async(execute_cmd, args={cmd})
-                    self.retry += 1
-        elif self.mode == self.MODE["friend_battle_guest"] and result.index == 2:
+
+        elif self.mode == self.MODE["friend_battle_guest"] and result.index == 3:
             if not result.is_grey:
                 if result.yellow_loc[0] != 0:
-                    if self.retry > 25 and self.retry % 50 == 0:
+                    if self.retry > 0 and self.retry % 5 == 0:
                         self.retry = 0
                         cmd = "adb -s {:s} shell input tap {:d} {:d}".format(self.device_id,
                                                                              result.yellow_loc[0],
                                                                              result.yellow_loc[1])
                         self.p.apply_async(execute_cmd, args={cmd})
-                    self.retry += 1
+        self.retry += 1
 
     def _record_reward(self, result, img):
         if self.game_start and not self.game_finish:

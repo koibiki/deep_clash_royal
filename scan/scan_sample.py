@@ -3,6 +3,8 @@ import numpy as np
 
 mate_color_dict = {"purple": [[170, 210], [95, 135], [240, 255]],
                    "yellow": [[230, 255], [165, 210], [40, 100]],
+                   "blue": [[80, 255], [230, 255], [240, 255]],
+                   "red": [[200, 255], [190, 230], [230, 255]]
                    }
 
 
@@ -23,13 +25,13 @@ def binary_thresh_pic(img, color_key):
     return bg
 
 
-imread = cv2.imread("../sample/2050448982.jpg")
+imread = cv2.imread("../sample/375.jpg")
 h, w, c = imread.shape
-imread0 = imread[int(0.8 * h):int(0.9 * h), w // 3: w // 2, :]
+imread0 = imread[int(0.38 * h):int(0.42 * h), w // 3: w * 2 // 3, :]
 
-imread1 = imread[int(0.7 * h):int(0.8 * h), w * 2 // 3: w * 5 // 6, :]
+imread1 = imread[int(0.09 * h):int(0.13 * h), w // 3:w * 2 // 3, :]
 
-thresh_pic = binary_thresh_pic(imread1, "yellow")
+thresh_pic = binary_thresh_pic(imread0, "blue")
 
 cv2.imshow("ss0", imread0)
 cv2.imshow("ss1", imread1)

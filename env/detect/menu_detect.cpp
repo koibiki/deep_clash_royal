@@ -12,7 +12,7 @@ static const int BACK_THRESH[3][3][2]{
         // normal
         {{135, 185}, {100, 145}, {75,  100}},
         {{65,  135}, {165, 240}, {190, 255}},
-        {{40,  80},  {40,  70},  {25,  50}}
+        {{40,  80},  {40,  70},  {25,  55}}
 };
 
 
@@ -32,7 +32,7 @@ struct MenuResult Menu::detect_tap_location(Mat &mat, int frame_index) {
     cv::Mat clipMat = this->clip_mat(mat);
 
     Mat scale_mat;
-    resize(clipMat, scale_mat, Size(0, 0), 0.3, 0.3);
+    resize(clipMat, scale_mat, Size(0, 0), 0.5, 0.5);
     int scale_width = scale_mat.size[1];
     int scale_height = scale_mat.size[0];
 
@@ -74,6 +74,10 @@ struct MenuResult Menu::detect_tap_location(Mat &mat, int frame_index) {
         RECT_HEIGHT = -1;
     }
     result.milli = tm.getTimeMilli();
+
+    if (debug) {
+        cv::waitKey(0);
+    }
 
     return result;
 }

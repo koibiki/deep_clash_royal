@@ -19,7 +19,12 @@ int main() {
 
     ButtonDetect buttonDetect;
 
-    Mat img = cv::imread("../2050448982.jpg");
+    Mat img = cv::imread("../375.jpg");
+
+    finishDetect.detect_finish(img, 0);
+
+
+    const MenuResult &location = menu.detect_tap_location(img, 0);
 
     const ButtonResult &buttonResult = buttonDetect.detect_button(img, 0);
 
