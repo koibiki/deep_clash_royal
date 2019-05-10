@@ -92,7 +92,7 @@ int main() {
             } else if (re.frame_state == RUNNING_STATE) {
                 cout << "id:" << gameId << "  running:" << re.frame_index << "  time:" << re.time << endl;
             } else if (re.frame_state == FINISH_STATE) {
-                cout << "id:" << gameId << "  is_finish:" << re.win << endl;
+                cout << "id:" << gameId << "  is_finish:" << re.battle_result << endl;
                 clashRoyalAgent.init_agent(++gameId);
             }
         }

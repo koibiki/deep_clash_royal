@@ -338,8 +338,6 @@ class BaseBrain:
 
             card_action = [action[0] - 1 + 92 * (action[2] * 6 + action[1]) for action in card_action]
 
-            # q_play_target[:, play_action] = reward + self.gamma * np.max(q_play_next, axis=1)
-
             for i in range(len(q_play_target)):
                 q_play_target[i, play_action[i]] = reward[i] + self.gamma * np.max(q_play_next[i])
 

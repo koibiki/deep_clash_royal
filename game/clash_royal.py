@@ -154,7 +154,7 @@ class ClashRoyal:
             self.pre_mine_crown = result.mine_crown
 
         if reward != 0:
-            self._update_reward(reward, result.frame_index - 25, 20)
+            self._update_reward(reward, result.frame_index - 10, 5)
         else:
             self._update_reward(reward, result.frame_index, 1)
 
@@ -176,7 +176,7 @@ class ClashRoyal:
     def _action_on_finish(self, result, img):
         self._finish_game()
         if self.log:
-            print("game in finish:" + str(result.win) + "  spent:" + str(result.milli))
+            print("game in finish:" + str(result.battle_result) + "  spent:" + str(result.milli))
         if not self.game_start:
             return
         self._record_reward(result, img)
@@ -228,8 +228,12 @@ class ClashRoyal:
     def _record_reward(self, result, img):
         if self.game_start and not self.game_finish:
             self.game_finish = True
-            reward = 1 - result.frame_index * 0.0001 if result.win else (-1 + result.frame_index * 0.0001)
-            self._update_reward(reward, result.frame_index - 35, 25)
+            reward = 0
+            if result.battle_result == 1:
+                reward = 1 - result.frame_index * 0.0001
+            elif result.battle_result == -1:
+                reward = -1 + result.frame_index * 0.0001
+            self._update_reward(reward, result.frame_index - 20, 10)
 
             if self.record:
 
@@ -250,22 +254,20 @@ class ClashRoyal:
                     for i in range(len(self.rewards[:self.running_frame_count - 10])):
                         f.write(str(i) + ":" + str(self.rewards[i]))
                         f.write("\n")
-                old_path = osp.join(self.root, str(self.game_id))
-                if result.win:
-                    self.memory_record.remove(self.game_id)
-                    new_path = osp.join(self.root, "win/" + str(self.game_id))
-                    os.rename(old_path, new_path)
-                else:
-                    new_path = osp.join(self.root, "fail/" + str(self.game_id))
-                    os.rename(old_path, new_path)
 
-            if len(self.memory_record) > 100:
-                pop_id = self.memory_record.pop(0)
-                shutil.rmtree(osp.join(self.root, "fail/" + str(pop_id)))
+                old_path = osp.join(self.root, str(self.game_id))
+                result_path = "fail"
+                if result.battle_result == 1:
+                    result_path = "win"
+                elif result.battle_result == 0:
+                    result_path = "draw"
+
+                new_path = osp.join(self.root, result_path + "/" + str(self.game_id))
+                os.rename(old_path, new_path)
 
             if len(self.rate_of_winning) > 20:
                 self.rate_of_winning.pop(0)
-            self.rate_of_winning.append(1 if result.win else 0)
+            self.rate_of_winning.append(1 if result.battle_result == 1 else 0)
 
             if len(self.reward_mean) > 50:
                 self.reward_mean.pop(0)
@@ -282,7 +284,7 @@ class ClashRoyal:
         self.retry += 1
 
     def _update_reward(self, reward_value, start_step, update_steps):
-        if self.log:
+        if self.log and reward_value != 0:
             print("update  step {}  reward {:f} ".format(start_step + update_steps, reward_value) + (
                 "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
                 if reward_value > 0 else "-------------------------------------------------------------------------"))
@@ -296,7 +298,7 @@ class ClashRoyal:
             if action[0] in observation[3]:
                 card_index = np.argmax([action[0] == item for item in observation[3]])
                 if observation[4][card_index] == 0:
-                    self._update_reward(-0.01, index, 1)
+                    self._update_reward(-0.1, index, 1)
                 else:
                     self.skip_step = 2
                     self._update_reward(0.01, index, 1)
@@ -311,7 +313,7 @@ class ClashRoyal:
                                                                                              loc_y)
                         self.p.apply_async(execute_cmd, args={cmd})
             else:
-                self._update_reward(-0.01, index, 1)
+                self._update_reward(-0.1, index, 1)
             self.actions[index] = action
         else:
             print("do nothing or skip step.")
@@ -322,7 +324,12 @@ class ClashRoyal:
         max_step = self.running_frame_count - skip_step
 
         img_paths = []
-        type_dir = "win" if result.win else "fail"
+        type_dir = "fail"
+        if result.battle_result == 1:
+            type_dir = "win"
+        elif result.battle_result == 0:
+            type_dir = "draw"
+
         save_dir = osp.join(self.root, type_dir + "/" + str(self.game_id)) + "/running"
         for index in range(max_step):
             indices = [index + 5, index, index - 5, index - 5 * 2, index - 5 * 3]
@@ -338,6 +345,9 @@ class ClashRoyal:
         return (np.sum(self.rate_of_winning) / (0.0001 + len(self.rate_of_winning)), \
                 np.sum(self.reward_mean) / (0.0001 + len(self.reward_mean)))
 
+    def reset(self):
+        self.game_start = False
+
 
 if __name__ == '__main__':
-    royal = ClashRoyal("./")
+    royal = ClashRoyal("./", "id")

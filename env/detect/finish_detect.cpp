@@ -28,11 +28,13 @@ FinishResult FinishDetect::detect_finish(cv::Mat &src, int frame_index) {
         bool lose = has_winner(opp_mat, 4);
 
         if (win && !lose) {
-            result.battle_win = true;
-        } else if (!win && lose) {
-            result.battle_win = false;
-        } else {
-            result.battle_win = is_win_finish(resize_src);
+            result.battle_result = 1;
+        }
+         if (!win && lose) {
+            result.battle_result = -1;
+        }
+        if (!win && !lose) {
+            result.battle_result = 0;
         }
 
     }

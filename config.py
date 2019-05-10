@@ -18,4 +18,6 @@ CARD_DICT = {0: "empty", 1: "Lightning", 2: "Furnace", 3: "GoblinBarrel", 4: "Da
              65: "Miner", 66: "Wizard", 67: "GiantSkeleton", 68: "Cannon", 69: "Zappies",
              70: "Graveyard", 71: "BabyDragon", 72: "LavaPups", 73: "Sparky", 74: "FlyingMachine",
              75: "ElectroDragon", 76: "InfernoTower", 77: "Balloon", 78: "BomberTower", 79: "Minions",
-             80: "MagicArcher", 81: "MinionHorde", 82: "LavaHound", 83: "Rocket", 84: "ElectorWizard", }
+             80: "MagicArcher", 81: "MinionHorde", 82: "LavaHound", 83: "Rocket", 84: "ElectorWizard",
+             85: "remain", 86: "remain", 87: "remain", 88: "remain", 89: "remain",
+             90: "remain", 91: "remain", 92: "remain", 93: "remain", }

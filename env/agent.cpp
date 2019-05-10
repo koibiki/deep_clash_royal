@@ -6,7 +6,6 @@
 
 ClashRoyalAgent::ClashRoyalAgent() {
     std::cout << "c++ init ClashRoyalAgent." << std::endl;
-
 }
 
 result ClashRoyalAgent::detect_frame(py_mat mat, result r) {
@@ -67,7 +66,7 @@ result ClashRoyalAgent::detect_mat(Mat src, result r) {
                 if (finishResult.is_finish && finish_count > 5) {
                     currentGameState = MENU_STATE;
                     r.frame_state = FINISH_STATE;
-                    r.win = finishResult.battle_win;
+                    r.battle_result = finishResult.battle_result;
                     r.frame_index = frame_index++;
 
                 } else {
@@ -104,7 +103,7 @@ result ClashRoyalAgent::detect_mat(Mat src, result r) {
             if (finishResult.is_finish && finish_count > 5) {
                 currentGameState = MENU_STATE;
                 r.frame_state = FINISH_STATE;
-                r.win = finishResult.battle_win;
+                r.battle_result = finishResult.battle_result;
                 r.frame_index = frame_index++;
             } else {
                 r.frame_state = ERROR_STATE;

@@ -1,8 +1,9 @@
-import cv2
 import time
+
+import cv2
+
 from brain.base_brain2 import BaseBrain
 from game.clash_royal import ClashRoyal
-from utils.c_lib_utils import convert2pymat
 
 if __name__ == '__main__':
 
@@ -10,14 +11,16 @@ if __name__ == '__main__':
 
     # root = "/home/chengli/data/gym_data/clash_royal"
     root = "/home/holaverse/work/07battle_filed/clash_royal"
+    device_id = "70a7da50"
+    # device_id = "cd9faa7f"
 
-    guest = ClashRoyal(root, device_id="70a7da50", mode=ClashRoyal.MODE["friend_battle_guest"], name="guest")
+    guest = ClashRoyal(root, device_id=device_id, mode=ClashRoyal.MODE["friend_battle_guest"], name="guest")
 
     base_brain = BaseBrain(guest, BaseBrain.BrainType["runner"], )
 
-    guest_address = "http://127.0.0.1:35013/device/70a7da50/video.flv"
-    # address = "./scan/s1.mp4"
-    # address = "http://127.0.0.1:46539/device/cd9faa7f/video.flv"
+    guest_address = "http://127.0.0.1:35013/device/" + device_id + "/video.flv"
+    # address = "http://127.0.0.1:46539/device/" + device_id + "/video.flv"
+
     guest_capture = cv2.VideoCapture(guest_address)
     while True:
         i += 1
@@ -44,3 +47,4 @@ if __name__ == '__main__':
             guest_capture.release()
             time.sleep(30)
             guest_capture = cv2.VideoCapture(guest_address)
+            guest.reset()

@@ -10,8 +10,7 @@
 
 struct FinishResult {
     bool is_finish = false;
-    bool battle_win = false;
-    double milli = 0.0;
+    int battle_result = -1;
 };
 
 class FinishDetect : protected BaseDetect {
@@ -20,7 +19,7 @@ private:
     int COLOR_DICT[5][3][2] = {
             // blue button upon finish page
             {{220, 255}, {150, 200}, {50,  110}},
-            // white text color upon finish page when win
+            // white text color upon finish page when battle_result
             {{240, 255}, {240, 255}, {240, 255}},
             // grey text color upon finish page when full chest
             {{200, 230}, {200, 230}, {200, 230}},

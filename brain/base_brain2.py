@@ -26,7 +26,7 @@ class BaseBrain:
                  reward_decay=0.9,
                  memory_size=50000,
                  batch_size=16,
-                 replace_target_iter=250, ):
+                 replace_target_iter=200, ):
         self.p = Pool(4)
         self.retry = 0
         self.n_card_actions = clash_royal.n_card_actions + 6 * 8
@@ -115,7 +115,7 @@ class BaseBrain:
 
             with tf.variable_scope('q'):
                 # Q = V(s) + A(s,a)
-                card_logit = card_value + (card_advantage - tf.reduce_mean(card_advantage, axis=-1, keepdims=True))
+                card_logit = card_value + (card_advantage - tf.reduce_mean(card_advantage))
                 card_logit = tf.layers.flatten(card_logit)
 
         return card_logit
@@ -187,18 +187,21 @@ class BaseBrain:
 
     def choose_action(self, observation):
         uniform = np.random.uniform()
-        if uniform <= 0.9:
+        if uniform <= 0.5:
             # forward feed the observation and get q value for every actions
             card_value = self.sess.run([self.q_card_eval],
                                        feed_dict={self.s_img: [observation[1]],
                                                   self.s_card_elixir: [observation[2]]})[0]
             index = np.argmax(card_value)
-            print("dqn play:" + str(index % 93 == 0))
+            print("dqn play:" + str(index % 93 != 0))
             if index % 93 != 0:
                 action = [index % 93, index % (93 * 6) // 93, index // (93 * 6)]
             else:
                 action = [0, 0, 0]
             print("dqn choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]))
+        elif uniform < 0.9:
+            action = [0, 0, 0]
+            print("random choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]))
         else:
             card = random.choice(observation[3])
             x_loc = random.choice(range(6))
@@ -312,8 +315,22 @@ class BaseBrain:
             for i in range(len(q_card_target)):
                 if card_action[i][0] != 0:
                     action = card_action[i]
-                    index = action[0] + 93 * (action[2] * 6 + action[1])
-                    q_card_target[:, index] = reward[i] + self.gamma * np.max(q_card_next[i])
+                    state_card = states[i][:92]
+                    state_available = states[i][92:92 * 2]
+                    has_card_index = np.where(state_card == 1)[0] + 1
+                    available_card_index = np.where(state_available == 1)[0] + 1
+                    available_index = np.intersect1d(has_card_index, available_card_index)
+
+                    if action[0] in available_index:
+                        index = action[0] + 93 * (action[2] * 6 + action[1])
+                        q_card_target[:, index] = reward[i] + self.gamma * np.max(q_card_next[i])
+                    else:
+                        random_indices = [i for i in range(1, 93) if i not in available_index]
+
+                        for random_index in random_indices:
+                            for ii in range(6 * 8):
+                                index = random_index + 93 * ii
+                                q_card_target[:, index] = reward[i] + self.gamma * np.max(q_card_next[i])
                 else:
                     for ii in range(6 * 8):
                         q_card_target[:, ii * 93] = reward[i] + self.gamma * np.max(q_card_next[i])
@@ -349,6 +366,6 @@ class BaseBrain:
 
 
 if __name__ == '__main__':
-    royal = ClashRoyal("../")
+    royal = ClashRoyal("../", "id")
     base_brain = BaseBrain(royal, 0)
     base_brain.load_memory("../../vysor")

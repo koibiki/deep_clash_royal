@@ -11,6 +11,5 @@ def build_mobilenetv2(_inputs, is_train):
         res6 = inverted_res_block(res5, 96, (3, 3), t=6, s=1, is_train=is_train, n=3, name='res6')
         res7 = inverted_res_block(res6, 160, (3, 3), t=6, s=2, is_train=is_train, n=3, name='res7')
         res8 = inverted_res_block(res7, 320, (3, 3), t=6, s=1, is_train=is_train, n=1, name='res8')
-
         conv9 = conv2d_block(res8, 512, 1, 1, is_train, name='conv9_1')
     return conv9

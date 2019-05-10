@@ -46,7 +46,7 @@ typedef struct Result {
     int card_type[4] = {0, 0, 0, 0};
     int available[4] = {0, 0, 0, 0};
     float prob[4] = {0.0, 0.0, 0.0, 0.0};
-    bool win = false;
+    int battle_result = -1;
     int frame_index = 0;
     int time;
     int remain_elixir = 5;
@@ -75,9 +75,8 @@ private:
 
     int currentGameState = MENU_STATE;
 
-    int frame_index;
-
     int gameId;
+    int frame_index = 0;
 
     int frame_w = 540;
     int frame_h = 960;
