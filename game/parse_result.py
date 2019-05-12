@@ -45,8 +45,9 @@ elixir_dict = {"empty": 0.0, "Lightning": 0.6, "Furnace": 0.4, "GoblinBarrel": 0
                }
 
 
-def parse_running_state(result):
-    card_type_state = parse_card_state(result.card_type, result.available)
+def parse_frame_state(result):
+    card_type = np.array(result.card_type)
+    card_available = np.array(result.available)
     remain_elixir = np.ones(1, dtype=np.float32)
     spent_time = np.ones(1, dtype=np.float32)
     double_elixir = np.ones(1, dtype=np.float32)
@@ -57,15 +58,21 @@ def parse_running_state(result):
     spent_time[0] = result.time / 60
     double_elixir[0] = 1 if result.time > 60 * 2 - 1 else 0
     dead_im[0] = 1 if result.time > 60 * 3 - 1 else 0
-    state = np.concatenate([card_type_state, hp, remain_elixir, spent_time, double_elixir, dead_im], axis=0)
+    state = np.concatenate([card_type, card_available, hp, remain_elixir, spent_time, double_elixir, dead_im], axis=0)
     return state
 
 
+def parse_running_state(state):
+    card_type_state = parse_card_state(state[:4].astype(np.int32), state[4:8].astype(np.int32))
+    state_vector = np.concatenate([card_type_state, state[8:]], axis=0)
+    return state_vector
+
+
 def parse_card_state(card_type, available):
-    card_type_state = np.zeros(92 * 3, dtype=np.float32)
+    card_type_state = np.zeros(93 * 4 + 4 + 4, dtype=np.float32)
     for i in range(4):
         if card_type[i] != 0:
-            card_type_state[card_type[i] - 1] = 1
-            card_type_state[92 + card_type[i] - 1] = available[i]
-            card_type_state[92 * 2 + card_type[i] - 1] = elixir_dict[card_dict[card_type[i]]]
+            card_type_state[93 * i + card_type[i]] = 1
+            card_type_state[93 * 4 + i] = available[i]
+            card_type_state[93 * 4 + 4 + i] = elixir_dict[card_dict[card_type[i]]]
     return card_type_state

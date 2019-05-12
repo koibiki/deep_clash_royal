@@ -10,7 +10,9 @@ h, w, c = img.shape
 
 w_gap = h_gap = w // num_align_width
 
-offset_w = w_gap // 2
+w_gap = 26 * 3
+
+offset_w = 36
 
 img_copy = img.copy()
 for x in range(num_align_width):
@@ -31,8 +33,8 @@ field = img[h_gap + h_gap // 4: 9 * h_gap + h_gap // 4, h_gap // 2:-h_gap // 2, 
 field = cv2.resize(field, (384 // 2, 512 // 2))
 
 f_h, f_w, f_c = field.shape
-field = cv2.flip(field, 1)
-img_copy = cv2.flip(img_copy, 1)
+# field = cv2.flip(field, 1)
+# img_copy = cv2.flip(img_copy, 1)
 cv2.imshow("ss", field)
 cv2.imshow("ssc", img_copy)
 cv2.waitKey(0)

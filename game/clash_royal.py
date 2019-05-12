@@ -1,15 +1,14 @@
 import ctypes
 import os
 import os.path as osp
-import shutil
 import time
 from multiprocessing.pool import Pool
-import numpy as np
-import random
+
 import cv2
+import numpy as np
 
 from config import CARD_DICT
-from game.parse_result import parse_running_state, card_dict, CARD_TYPE
+from game.parse_result import parse_frame_state
 from utils.c_lib_utils import Result, STATE_DICT, convert2pymat
 from utils.cmd_utils import execute_cmd
 
@@ -26,6 +25,10 @@ class ClashRoyal:
     def __init__(self, root, device_id, mode=MODE["battle"], name="gamer0"):
         super().__init__()
         w = 1080
+
+        # 1080 - 54 * 4   每个格子48
+
+
         num_align_width = 7
         num_align_height = 8
         self.w_gap = self.h_gap = w_gap = h_gap = w // num_align_width
@@ -50,7 +53,7 @@ class ClashRoyal:
         self.n_card_actions = 92 * len(self.loc_x_action_choices) * len(self.loc_y_action_choices)  # 92 种牌 x y
         self.img_shape = (256, 192, 3 * 4)
         # 是否有92种card 92种card是否可用 92种card消耗圣水量 剩余圣水量 耗时 双倍圣水 即死 (我方血量 对方血量)
-        self.state_shape = 92 * 3 + 1 + 1 + 1 + 1 + 2
+        self.state_shape = 93 * 4 + 4 + 4 + 1 + 1 + 1 + 1 + 2
 
         self.memory_record = []
         self.rate_of_winning = []
@@ -88,7 +91,7 @@ class ClashRoyal:
         result = self.lib.detect_frame(pymat, result)
 
         self._process_result(result, img)
-        if self.game_start and result.frame_state == STATE_DICT["RUNNING_STATE"]:
+        if self.game_start and result.frame_state == STATE_DICT["RUNNING_STATE"] and result.frame_index >= 0:
             img_range = []
             for ii in range(4):
                 index = 0 if result.frame_index - ii * 5 < 0 else result.frame_index - ii * 5
@@ -142,7 +145,8 @@ class ClashRoyal:
                                                                    result.prob[2],
                                                                    CARD_DICT[result.card_type[3]],
                                                                    result.prob[3], ))
-
+        if result.frame_index < 0:
+            return
         self.running_frame_count += 1
         self.skip_step = self.skip_step - 1 if self.skip_step > 0 else 0
         reward = 0
@@ -158,7 +162,7 @@ class ClashRoyal:
         else:
             self._update_reward(reward, result.frame_index, 1)
 
-        state = parse_running_state(result)
+        state = parse_frame_state(result)
 
         self.states[result.frame_index] = state
         img_state = img[self.h_gap // 2 + self.h_gap // 8: 9 * self.h_gap // 2 + self.h_gap // 8,
@@ -300,7 +304,7 @@ class ClashRoyal:
                 if observation[4][card_index] == 0:
                     self._update_reward(-0.1, index, 1)
                 else:
-                    self.skip_step = 2
+                    self.skip_step = 5
                     self._update_reward(0.01, index, 1)
                     card = self.card_choices[card_index]
                     loc_x = self.loc_y_action_choices[action[1]]
@@ -313,7 +317,7 @@ class ClashRoyal:
                                                                                              loc_y)
                         self.p.apply_async(execute_cmd, args={cmd})
             else:
-                self._update_reward(-0.1, index, 1)
+                self._update_reward(-0.01, index, 1)
             self.actions[index] = action
         else:
             print("do nothing or skip step.")

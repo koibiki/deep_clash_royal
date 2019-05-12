@@ -10,11 +10,12 @@ from tensorflow.contrib.slim.python.slim.nets import resnet_v2
 
 from brain.memory import Memory
 from game.clash_royal import ClashRoyal
+from game.parse_result import parse_running_state
 from net.mobilenet_v2 import build_mobilenetv2
 from utils.img_utils import add_salt_and_pepper, add_gaussian_noise
 
 
-class BaseBrain:
+class DQN:
     BrainType = {"double": 0,
                  "runner": 1,
                  "trainer": 2}
@@ -22,12 +23,11 @@ class BaseBrain:
     def __init__(self,
                  clash_royal,
                  brain_type,
-                 lr=0.0001,
+                 lr=0.00001,
                  reward_decay=0.9,
                  memory_size=50000,
                  batch_size=16,
                  replace_target_iter=200, ):
-        self.p = Pool(4)
         self.retry = 0
         self.n_card_actions = clash_royal.n_card_actions + 6 * 8
         self.img_shape = clash_royal.img_shape
@@ -43,7 +43,7 @@ class BaseBrain:
         self.gamma = reward_decay
         self.replace_target_iter = replace_target_iter
         self.memory_size = memory_size
-        self.batch_size = batch_size
+        self.batch_size = batch_size if brain_type != self.BrainType["runner"] else 1
         self.epsilon = 0.9
 
         # total learning step
@@ -77,15 +77,17 @@ class BaseBrain:
             self.sess.run(tf.global_variables_initializer())
             self.load_model()
 
+            self.sess.run(self.target_replace_op)
+
             self.writer = tf.summary.FileWriter("./logs/" + clash_royal.name)
             self.writer.add_graph(self.sess.graph)
             self.merge_summary = tf.summary.merge_all()
 
-    def _build_net(self, s_img, s_card_elixir):
+    def _build_net(self, s_img, s_card_elixir, is_train):
 
         with tf.variable_scope('cnn'):
             # out = resnet_v2.resnet_v2_50(s_img)[1][scope + "/cnn/resnet_v2_50/block4"]
-            out = build_mobilenetv2(s_img, True)
+            out = build_mobilenetv2(s_img, is_train)
 
             loc = tf.layers.average_pooling2d(out, (2, 2), (2, 2), )
 
@@ -93,6 +95,7 @@ class BaseBrain:
 
             cnn_concat = tf.concat([out, cnn_out], axis=-1)
 
+            # if is_train:
             cnn_concat = tf.layers.dropout(cnn_concat, 0.5)
 
         with tf.variable_scope('executor'):
@@ -111,11 +114,11 @@ class BaseBrain:
                 card_value = tf.layers.conv2d(concat, 1, (3, 3), (1, 1), padding="same")
 
             with tf.variable_scope('advantage'):
-                card_advantage = tf.layers.conv2d(concat, 93, (3, 3), (1, 1), padding="same")
+                card_advantage = tf.layers.conv2d(concat, 5, (3, 3), (1, 1), padding="same")
 
             with tf.variable_scope('q'):
                 # Q = V(s) + A(s,a)
-                card_logit = card_value + (card_advantage - tf.reduce_mean(card_advantage))
+                card_logit = card_value + (card_advantage - tf.reduce_mean(card_advantage, axis=-1, keepdims=True))
                 card_logit = tf.layers.flatten(card_logit)
 
         return card_logit
@@ -136,12 +139,12 @@ class BaseBrain:
             tf.placeholder(tf.float32, [None, self.img_shape[0], self.img_shape[1], self.img_shape[2]], name='image')
         self.s_card_elixir = tf.placeholder(tf.float32, [None, self.state_shape], name='state')
 
-        self.q_card_target = tf.placeholder(tf.float32, [None, self.n_card_actions], name='Q_card_target')
+        self.q_card_target = tf.placeholder(tf.float32, [None, 5 * 6 * 8], name='Q_card_target')
 
         self.weights = tf.placeholder(tf.float32, [None, 1], name='IS_weights')
 
         with tf.variable_scope('eval_net'):
-            self.q_card_eval = self._build_net(self.s_img, self.s_card_elixir, )
+            self.q_card_eval = self._build_net(self.s_img, self.s_card_elixir, True)
 
         with tf.variable_scope('loss'):
             reg_loss = tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
@@ -165,7 +168,7 @@ class BaseBrain:
         self.s_card_elixir_ = tf.placeholder(tf.float32, [None, self.state_shape], name='state_')
 
         with tf.variable_scope('target_net'):
-            self.q_card_next = self._build_net(self.s_img_, self.s_card_elixir_, )
+            self.q_card_next = self._build_net(self.s_img_, self.s_card_elixir_, False)
 
     def store_transition(self, episode_record):
         game_id = episode_record[0]
@@ -187,19 +190,22 @@ class BaseBrain:
 
     def choose_action(self, observation):
         uniform = np.random.uniform()
-        if uniform <= 0.5:
+        if uniform <= 0.8:
             # forward feed the observation and get q value for every actions
             card_value = self.sess.run([self.q_card_eval],
                                        feed_dict={self.s_img: [observation[1]],
-                                                  self.s_card_elixir: [observation[2]]})[0]
+                                                  self.s_card_elixir: [parse_running_state(observation[2])]})[0]
             index = np.argmax(card_value)
-            print("dqn play:" + str(index % 93 != 0))
-            if index % 93 != 0:
-                action = [index % 93, index % (93 * 6) // 93, index // (93 * 6)]
+            print("dqn play:" + str(index % 5 != 0) + " " + str(card_value[0][index]))
+            if index % 5 != 0:
+                action = [observation[3][index % 5 - 1], index % (5 * 6) // 5, index // (5 * 6)]
+                print("dqn choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]) + \
+                      "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
             else:
                 action = [0, 0, 0]
-            print("dqn choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]))
-        elif uniform < 0.9:
+                print("dqn choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]) + \
+                      "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+        elif uniform < 0.99:
             action = [0, 0, 0]
             print("random choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]))
         else:
@@ -249,7 +255,7 @@ class BaseBrain:
             imgs.append(step_img)
             next_imgs.append(next_step_img)
             if flip:
-                action = 3 + 2 - self.memory.action_dict[item][1]
+                action = 5 - self.memory.action_dict[item][1]
             else:
                 action = self.memory.action_dict[item][1]
             x_action.append(action)
@@ -274,6 +280,7 @@ class BaseBrain:
         y_action = [self.memory.action_dict[item][2] for item in batch_memory]
         reward = np.array([self.memory.reward_dict[item] for item in batch_memory])
         card_action = [[card_type_action[i], x_action[i], y_action[i]] for i in range(len(card_type_action))]
+
         return imgs, states, card_action, reward, next_imgs, next_states
 
     def record_battle_result(self):
@@ -303,42 +310,48 @@ class BaseBrain:
             imgs, states, card_action, reward, next_imgs, next_states \
                 = self._prepare_data(batch_memory)
 
+            states_vector = [parse_running_state(state) for state in states]
+            next_states_vector = [parse_running_state(state) for state in next_states]
+
             q_card_next, q_card_eval, = self.sess.run(
                 [self.q_card_next, self.q_card_eval],
                 feed_dict={self.s_img_: next_imgs,
-                           self.s_card_elixir_: next_states,
+                           self.s_card_elixir_: next_states_vector,
                            self.s_img: imgs,
-                           self.s_card_elixir: states})
+                           self.s_card_elixir: states_vector})
 
             q_card_target = q_card_eval.copy()
 
             for i in range(len(q_card_target)):
                 if card_action[i][0] != 0:
                     action = card_action[i]
-                    state_card = states[i][:92]
-                    state_available = states[i][92:92 * 2]
-                    has_card_index = np.where(state_card == 1)[0] + 1
-                    available_card_index = np.where(state_available == 1)[0] + 1
-                    available_index = np.intersect1d(has_card_index, available_card_index)
-
-                    if action[0] in available_index:
-                        index = action[0] + 93 * (action[2] * 6 + action[1])
-                        q_card_target[:, index] = reward[i] + self.gamma * np.max(q_card_next[i])
-                    else:
-                        random_indices = [i for i in range(1, 93) if i not in available_index]
-
-                        for random_index in random_indices:
+                    state_card = states[i][:4]
+                    state_available = states[i][4:8]
+                    available_card = state_card * state_available
+                    if action[0] in state_card:
+                        if action[0] in available_card:
+                            loc = np.where(available_card == action[0])[0][0]
+                            index = loc + 1 + 5 * (action[2] * 6 + action[1])
+                            q_card_target[:, index] = reward[i] + self.gamma * np.max(q_card_next[i])
+                        else:
+                            loc = np.where(state_card == action[0])[0][0]
+                            if reward[i] == -0.1:
+                                reward[i] = -0.01
                             for ii in range(6 * 8):
-                                index = random_index + 93 * ii
+                                index = loc + 1 + 5 * ii
                                 q_card_target[:, index] = reward[i] + self.gamma * np.max(q_card_next[i])
+                    else:
+                        print("action card not in desk.")
+                        for ii in range(6 * 8):
+                            q_card_target[:, ii * 5] = reward[i] + self.gamma * np.max(q_card_next[i])
                 else:
                     for ii in range(6 * 8):
-                        q_card_target[:, ii * 93] = reward[i] + self.gamma * np.max(q_card_next[i])
+                        q_card_target[:, ii * 5] = reward[i] + self.gamma * np.max(q_card_next[i])
 
             _, abs_errors, loss, summary = self.sess.run(
                 [self._train_op, self.abs_errors, self.loss, self.merge_summary],
                 feed_dict={self.s_img: imgs,
-                           self.s_card_elixir: states,
+                           self.s_card_elixir: states_vector,
                            self.q_card_target: q_card_target,
                            self.weights: weights})
 
@@ -367,5 +380,5 @@ class BaseBrain:
 
 if __name__ == '__main__':
     royal = ClashRoyal("../", "id")
-    base_brain = BaseBrain(royal, 0)
+    base_brain = DQN(royal, 0)
     base_brain.load_memory("../../vysor")

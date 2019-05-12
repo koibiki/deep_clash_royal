@@ -132,7 +132,7 @@ cv::Mat ClashRoyalAgent::transfer_mat(py_mat mat) {
 }
 
 void ClashRoyalAgent::init_agent(int gameId) {
-    this->frame_index = 0;
+    this->frame_index = -5;
     this->currentGameState = MENU_STATE;
     this->gameId = gameId;
     this->cardDetect.reset();

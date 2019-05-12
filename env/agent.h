@@ -76,7 +76,7 @@ private:
     int currentGameState = MENU_STATE;
 
     int gameId;
-    int frame_index = 0;
+    int frame_index = -5;
 
     int frame_w = 540;
     int frame_h = 960;

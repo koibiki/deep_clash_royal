@@ -2,24 +2,24 @@ import time
 
 import cv2
 
-from brain.base_brain2 import BaseBrain
+from brain.dqn import DQN
 from game.clash_royal import ClashRoyal
 
 if __name__ == '__main__':
 
     i = 0
 
-    # root = "/home/chengli/data/gym_data/clash_royal"
-    root = "/home/holaverse/work/07battle_filed/clash_royal"
+    root = "/home/chengli/data/gym_data/clash_royal"
+    # root = "/home/holaverse/work/07battle_filed/clash_royal"
     device_id = "70a7da50"
     # device_id = "cd9faa7f"
 
     guest = ClashRoyal(root, device_id=device_id, mode=ClashRoyal.MODE["friend_battle_guest"], name="guest")
 
-    base_brain = BaseBrain(guest, BaseBrain.BrainType["runner"], )
+    base_brain = DQN(guest, DQN.BrainType["runner"], )
 
-    guest_address = "http://127.0.0.1:35013/device/" + device_id + "/video.flv"
-    # address = "http://127.0.0.1:46539/device/" + device_id + "/video.flv"
+    # guest_address = "http://127.0.0.1:35013/device/" + device_id + "/video.flv"
+    guest_address = "http://127.0.0.1:46539/device/" + device_id + "/video.flv"
 
     guest_capture = cv2.VideoCapture(guest_address)
     while True:
