@@ -15,9 +15,9 @@ if __name__ == '__main__':
     # device_id = "70a7da50"
     device_id = "cd9faa7f"
 
-    host = ClashRoyal(root, device_id=device_id, mode=ClashRoyal.MODE["friend_battle_host"], name="host")
+    host = ClashRoyal(root, device_id=device_id, mode=ClashRoyal.MODE["battle"], name="host")
 
-    base_brain = DDPG(host.img_shape, host.state_shape, DDPG.BrainType["runner"], "host")
+    brain = DDPG(host.img_shape, host.state_shape, DDPG.BrainType["runner"], "battle")
 
     host_address = "http://127.0.0.1:35013/device/" + device_id + "/video.flv"
     # host_address = "http://127.0.0.1:46539/device/" + device_id + "/video.flv"
@@ -40,13 +40,13 @@ if __name__ == '__main__':
 
             host_observation = host.frame_step(host_img)
             if host_observation is not None:
-                host_action = base_brain.choose_action(host_observation)
+                host_action = brain.choose_action(host_observation)
                 host.step(host_observation, host_action)
 
             if host.game_start and host.game_finish and host.retry <= 1:
-                base_brain.update_episode_result(host.get_rate_of_winning())
-                base_brain.record_battle_result()
-                base_brain.load_model()
+                brain.update_episode_result(host.get_rate_of_winning())
+                brain.record_battle_result()
+                brain.load_model()
 
         else:
             print("没有信号..")

@@ -220,7 +220,7 @@ class Memory(object):  # stored as ( s, a, r, s_ ) in SumTree
                 split = line.strip().split(":")
                 index = int(split[0])
                 action_str = split[1].replace("[", "").replace("]", "").replace(" ", "").split(",")
-                action = [int(item) for item in action_str]
+                action = [int(action_str[0]), float(action_str[1]), float(action_str[2])]
                 key = str(game_id) + "_" + str(index)
                 self.action_dict[key] = action
                 keys.append(key)

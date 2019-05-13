@@ -14,7 +14,9 @@ from game.parse_result import parse_running_state
 from net.mobilenet_v2 import build_mobilenetv2
 from utils.img_utils import add_salt_and_pepper, add_gaussian_noise
 
-
+"""
+暂留 改动过大 已无法运行
+"""
 class DQN:
     BrainType = {"double": 0,
                  "runner": 1,
@@ -190,7 +192,7 @@ class DQN:
 
     def choose_action(self, observation):
         uniform = np.random.uniform()
-        if uniform <= 0.8:
+        if uniform <= 0.5:
             # forward feed the observation and get q value for every actions
             card_value = self.sess.run([self.q_card_eval],
                                        feed_dict={self.s_img: [observation[1]],
@@ -205,7 +207,7 @@ class DQN:
                 action = [0, 0, 0]
                 print("dqn choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]) + \
                       "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-        elif uniform < 0.99:
+        elif uniform < 0.9:
             action = [0, 0, 0]
             print("random choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]))
         else:

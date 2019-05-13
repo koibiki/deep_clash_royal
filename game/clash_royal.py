@@ -28,11 +28,13 @@ class ClashRoyal:
 
         # 1080 - 54 * 4   每个格子48
 
+        self.offset_w = 39
 
-        num_align_width = 7
-        num_align_height = 8
-        self.w_gap = self.h_gap = w_gap = h_gap = w // num_align_width
-        offset_w = w_gap // 2
+        self.offset_h = 94
+
+        self.width = 1080 // 2 - self.offset_w * 2
+        self.height = 62 * 10
+
         ll = ctypes.cdll.LoadLibrary
         self.device_id = device_id
         self.mode = mode
@@ -47,13 +49,11 @@ class ClashRoyal:
         self.log = True
         self.p = Pool(6)
         self.retry = 0
-        self.loc_x_action_choices = [offset_w + x * w_gap + w_gap // 2 for x in range(num_align_width - 1)]
-        self.loc_y_action_choices = [(y + 1) * h_gap + h_gap * 3 // 4 for y in range(num_align_height)]
         self.card_choices = [[340, 1720], [560, 1702], [738, 1698], [938, 1718]]
-        self.n_card_actions = 92 * len(self.loc_x_action_choices) * len(self.loc_y_action_choices)  # 92 种牌 x y
+        self.n_card_actions = 93
         self.img_shape = (256, 192, 3 * 4)
-        # 是否有92种card 92种card是否可用 92种card消耗圣水量 剩余圣水量 耗时 双倍圣水 即死 (我方血量 对方血量)
-        self.state_shape = 93 * 4 + 4 + 4 + 1 + 1 + 1 + 1 + 2
+        # 92种card是否可用 92种card消耗圣水量 (我方血量 对方血量) 剩余圣水量 耗时 双倍圣水 即死
+        self.state_shape = 92 * 2 + 2 + 1 + 1 + 1 + 1
 
         self.memory_record = []
         self.rate_of_winning = []
@@ -149,7 +149,7 @@ class ClashRoyal:
             return
         self.running_frame_count += 1
         self.skip_step = self.skip_step - 1 if self.skip_step > 0 else 0
-        reward = 0
+        reward = 0.01
         if result.opp_crown > self.pre_opp_crown:
             reward = -0.5
             self.pre_opp_crown = result.opp_crown
@@ -157,16 +157,15 @@ class ClashRoyal:
             reward = 0.3
             self.pre_mine_crown = result.mine_crown
 
-        if reward != 0:
-            self._update_reward(reward, result.frame_index - 10, 5)
+        if reward != 0.01:
+            self._update_reward(reward, result.frame_index - 5)
         else:
-            self._update_reward(reward, result.frame_index, 1)
+            self._update_reward(reward, result.frame_index)
 
         state = parse_frame_state(result)
 
         self.states[result.frame_index] = state
-        img_state = img[self.h_gap // 2 + self.h_gap // 8: 9 * self.h_gap // 2 + self.h_gap // 8,
-                    self.h_gap // 4:-self.h_gap // 4, :]
+        img_state = img[self.offset_h: self.offset_h + self.height, self.offset_w: - self.offset_w, :]
         self.imgs[result.frame_index] = cv2.resize(img_state, (192, 256))
 
         if self.record:
@@ -234,10 +233,10 @@ class ClashRoyal:
             self.game_finish = True
             reward = 0
             if result.battle_result == 1:
-                reward = 1 - result.frame_index * 0.0001
+                reward = 1
             elif result.battle_result == -1:
-                reward = -1 + result.frame_index * 0.0001
-            self._update_reward(reward, result.frame_index - 20, 10)
+                reward = -1
+            self._update_reward(reward, result.frame_index - 11)
 
             if self.record:
 
@@ -287,13 +286,13 @@ class ClashRoyal:
             self.p.apply_async(execute_cmd, args={cmd})
         self.retry += 1
 
-    def _update_reward(self, reward_value, start_step, update_steps):
+    def _update_reward(self, reward_value, index):
         if self.log and reward_value != 0:
-            print("update  step {}  reward {:f} ".format(start_step + update_steps, reward_value) + (
+            print("update  step {}  reward {:f} ".format(index, reward_value) + (
                 "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
                 if reward_value > 0 else "-------------------------------------------------------------------------"))
-        for i in range(update_steps):
-            self.rewards[start_step + i] += reward_value * (i + 1) / update_steps
+
+        self.rewards[index] += reward_value
 
     def step(self, observation, action):
         index = observation[0]
@@ -302,13 +301,13 @@ class ClashRoyal:
             if action[0] in observation[3]:
                 card_index = np.argmax([action[0] == item for item in observation[3]])
                 if observation[4][card_index] == 0:
-                    self._update_reward(-0.1, index, 1)
+                    self._update_reward(-0.05, index)
                 else:
                     self.skip_step = 5
-                    self._update_reward(0.01, index, 1)
+                    self._update_reward(0.01, index)
                     card = self.card_choices[card_index]
-                    loc_x = self.loc_y_action_choices[action[1]]
-                    loc_y = self.loc_y_action_choices[action[2]]
+                    loc_x = int(action[1] * self.width * 2) + self.offset_w * 2
+                    loc_y = int(action[2] * self.height * 2) + self.offset_h * 2
                     if self.real_time:
                         cmd = "adb -s {:s} shell input swipe {:d} {:d} {:d} {:d} 300".format(self.device_id,
                                                                                              card[0],
@@ -317,7 +316,7 @@ class ClashRoyal:
                                                                                              loc_y)
                         self.p.apply_async(execute_cmd, args={cmd})
             else:
-                self._update_reward(-0.01, index, 1)
+                self._update_reward(-0.05, index)
             self.actions[index] = action
         else:
             print("do nothing or skip step.")

@@ -1,18 +1,19 @@
 import cv2
 
 num_align_width = 7
-num_align_height = 8
+num_align_height = 12
 
 img = cv2.imread("../sample/field.jpg")
 
 # img = cv2.resize(img, None, None, 0.5, 0.5, )
 h, w, c = img.shape
 
-w_gap = h_gap = w // num_align_width
+w_gap = 77
+h_gap = 62
 
-w_gap = 26 * 3
+offset_w = 39
 
-offset_w = 36
+offset_h = 94
 
 img_copy = img.copy()
 for x in range(num_align_width):
@@ -20,7 +21,8 @@ for x in range(num_align_width):
         # cv2.line(img, (0, (y + 1) * h_gap), (w, (y + 1) * h_gap), (200, 200, 255), thickness=1)
         # cv2.line(img, (x * w_gap, 0), (x * w_gap, num_align_height * h_gap), (200, 200, 255), thickness=1)
 
-        cv2.line(img_copy, (0, (y + 1) * h_gap + h_gap // 4), (w, (y + 1) * h_gap + h_gap // 4), (200, 200, 255),
+        h_loc = y * h_gap + offset_h
+        cv2.line(img_copy, (0, h_loc), (w, h_loc), (200, 200, 255),
                  thickness=1)
         cv2.line(img_copy, (offset_w + x * w_gap, 0), (offset_w + x * w_gap, num_align_height * h_gap), (200, 200, 255),
                  thickness=1)
