@@ -12,8 +12,9 @@ if __name__ == '__main__':
     # root = "/home/chengli/data/gym_data/clash_royal"
     root = "/home/holaverse/work/07battle_filed/clash_royal"
 
-    # device_id = "70a7da50"
-    device_id = "cd9faa7f"
+    device_id = "70a7da50"
+    # device_id = "cd9faa7f"
+    # device_id = "YP99IN9PE6V4GES8"
 
     host = ClashRoyal(root, device_id=device_id, mode=ClashRoyal.MODE["battle"], name="host")
 
@@ -26,19 +27,25 @@ if __name__ == '__main__':
 
     while True:
         i += 1
-        host_state, host_img = host_capture.read()
+        host_state, img = host_capture.read()
 
         if host_state:
 
             if i % 20 != 0:
                 continue
+            h, w, c = img.shape
+            print("h:" + str(h) + " w:" + str(w))
+            # if h > 1920 and w == 1080:
+            #     img = img[:1920, :, :]
+            # if h > 1920 and w == 1080:
+            #     img = img[:1920, :, :]
 
-            host_img = cv2.resize(host_img, (540, 960))
+            img = cv2.resize(img, (540, 960))
 
             # cv2.imshow('image', img)
             # cv2.waitKey(0)
 
-            host_observation = host.frame_step(host_img)
+            host_observation = host.frame_step(img)
             if host_observation is not None:
                 host_action = brain.choose_action(host_observation)
                 host.step(host_observation, host_action)

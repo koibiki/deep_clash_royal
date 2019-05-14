@@ -149,7 +149,7 @@ class ClashRoyal:
             return
         self.running_frame_count += 1
         self.skip_step = self.skip_step - 1 if self.skip_step > 0 else 0
-        reward = 0.01
+        reward = -0.01
         if result.opp_crown > self.pre_opp_crown:
             reward = -0.5
             self.pre_opp_crown = result.opp_crown
@@ -157,7 +157,7 @@ class ClashRoyal:
             reward = 0.3
             self.pre_mine_crown = result.mine_crown
 
-        if reward != 0.01:
+        if reward != -0.01:
             self._update_reward(reward, result.frame_index - 5)
         else:
             self._update_reward(reward, result.frame_index)
@@ -233,9 +233,9 @@ class ClashRoyal:
             self.game_finish = True
             reward = 0
             if result.battle_result == 1:
-                reward = 1
+                reward = 1 - result.time * 0.001
             elif result.battle_result == -1:
-                reward = -1
+                reward = -1 + result.time * 0.001
             self._update_reward(reward, result.frame_index - 11)
 
             if self.record:
@@ -287,7 +287,7 @@ class ClashRoyal:
         self.retry += 1
 
     def _update_reward(self, reward_value, index):
-        if self.log and reward_value != 0:
+        if self.log and reward_value != -0.01:
             print("update  step {}  reward {:f} ".format(index, reward_value) + (
                 "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
                 if reward_value > 0 else "-------------------------------------------------------------------------"))
@@ -304,7 +304,7 @@ class ClashRoyal:
                     self._update_reward(-0.05, index)
                 else:
                     self.skip_step = 5
-                    self._update_reward(0.01, index)
+                    self._update_reward(0.06, index)
                     card = self.card_choices[card_index]
                     loc_x = int(action[1] * self.width * 2) + self.offset_w * 2
                     loc_y = int(action[2] * self.height * 2) + self.offset_h * 2

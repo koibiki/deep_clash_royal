@@ -11,8 +11,9 @@ if __name__ == '__main__':
 
     # root = "/home/chengli/data/gym_data/clash_royal"
     root = "/home/holaverse/work/07battle_filed/clash_royal"
-    device_id = "70a7da50"
+    # device_id = "70a7da50"
     # device_id = "cd9faa7f"
+    device_id = "HT6530315865"
 
     guest = ClashRoyal(root, device_id=device_id, mode=ClashRoyal.MODE["friend_battle_guest"], name="guest")
 
@@ -24,15 +25,17 @@ if __name__ == '__main__':
     guest_capture = cv2.VideoCapture(guest_address)
     while True:
         i += 1
-        guest_state, guest_img = guest_capture.read()
+        guest_state, img = guest_capture.read()
 
         if guest_state:
 
-            if i % 20 != 0:
+            if i % 30 != 0:
                 continue
-            guest_img = cv2.resize(guest_img, (540, 960))
+            h, w, c = img.shape
 
-            guest_observation = guest.frame_step(guest_img)
+            img = cv2.resize(img, (540, 960))
+
+            guest_observation = guest.frame_step(img)
             if guest_observation is not None:
                 guest_action = base_brain.choose_action(guest_observation)
                 guest.step(guest_observation, guest_action)

@@ -22,7 +22,7 @@ class DDPG(object):
                  state_shape,
                  brain_type,
                  name,
-                 lr=0.001,
+                 lr=0.0001,
                  gama=0.9,
                  memory_size=50000,
                  batch_size=16, ):
