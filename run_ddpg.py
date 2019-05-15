@@ -2,7 +2,8 @@ import time
 
 import cv2
 
-from brain.ddpg import DDPG
+from brain.ddpg2 import DDPG
+from device.mobile import Mobile
 from game.clash_royal import ClashRoyal
 
 if __name__ == '__main__':
@@ -12,11 +13,11 @@ if __name__ == '__main__':
     # root = "/home/chengli/data/gym_data/clash_royal"
     root = "/home/holaverse/work/07battle_filed/clash_royal"
 
-    device_id = "70a7da50"
-    # device_id = "cd9faa7f"
+    # device_id = "70a7da50"
+    device_id = "cd9faa7f"
     # device_id = "YP99IN9PE6V4GES8"
 
-    host = ClashRoyal(root, device_id=device_id, mode=ClashRoyal.MODE["battle"], name="host")
+    host = ClashRoyal(root, Mobile(device_id), mode=ClashRoyal.MODE["battle"], name="host")
 
     brain = DDPG(host.img_shape, host.state_shape, DDPG.BrainType["runner"], "battle")
 

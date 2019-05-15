@@ -395,7 +395,7 @@ class DDPG(object):
             q_x_target = q_x_eval.copy()
             q_y_target = q_y_eval.copy()
 
-            reward = self._discount_and_norm_rewards(reward)
+            # reward = self._discount_and_norm_rewards(reward)
 
             for i in range(len(q_card_target)):
                 action_item = actions[i]

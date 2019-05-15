@@ -99,13 +99,15 @@ class DDPG(object):
         with tf.variable_scope('actor', ):
             card_dense = tf.layers.dense(squeeze, 512, activation=tf.nn.relu)
 
-            card_value = tf.layers.dense(card_dense, 93, name="card_value")
+            action_prob = tf.layers.dense(card_dense, 2)
+
+            card_value = tf.layers.dense(card_dense, 92, name="card_value")
 
             card_prob = tf.nn.softmax(card_value, name="card_prob")
 
             # loc 的预测只与已选出的 card 有关
             select_card = tf.argmax(card_value, axis=-1, output_type=tf.int32)
-            card_type = tf.one_hot(select_card, 93)
+            card_type = tf.one_hot(select_card, 92)
 
             cnn_card = tf.concat([cnn_flatten, card_type, env_state], axis=-1)
 
@@ -114,10 +116,14 @@ class DDPG(object):
             loc_y = tf.layers.dense(cnn_card, 1, activation=tf.nn.sigmoid, name="loc_y")
 
         with tf.variable_scope("critic", ):
+            cnn_card_has_action = tf.concat([squeeze, action_prob], axis=-1)
+
             card_state_type = tf.concat([squeeze, card_type], axis=-1)
 
             cnn_card_loc_x = tf.concat([cnn_card, loc_x], axis=-1)
             cnn_card_loc_y = tf.concat([cnn_card, loc_y], axis=-1)
+
+            q_has_action = tf.layers.dense(cnn_card_has_action, 1, name="q_has_action")
 
             q_card = tf.layers.dense(card_state_type, 1, name="q_card")
 
@@ -125,7 +131,7 @@ class DDPG(object):
 
             q_loc_y = tf.layers.dense(cnn_card_loc_y, 1, name="q_loc_y")
 
-        return card_prob, card_value, loc_x, loc_y, q_card, q_loc_x, q_loc_y
+        return action_prob, card_prob, card_value, loc_x, loc_y, q_has_action, q_card, q_loc_x, q_loc_y
 
     def _build_eval_target_net(self):
 
@@ -143,10 +149,12 @@ class DDPG(object):
             tf.placeholder(tf.float32, [None, self.img_shape[0], self.img_shape[1], self.img_shape[2]], name='image')
         self.s_card_elixir = tf.placeholder(tf.float32, [None, self.state_shape], name='state')
 
+        self.has_action = tf.placeholder(tf.int32, [None, ], name='has_action')
         self.card_action = tf.placeholder(tf.int32, [None, ], name='card_action')
         self.x_action = tf.placeholder(tf.float32, [None, ], name='x_action')
         self.y_action = tf.placeholder(tf.float32, [None, ], name='y_action')
 
+        self.q_has_action_target = tf.placeholder(tf.float32, [None, 1], name='Q_action_target')
         self.q_card_target = tf.placeholder(tf.float32, [None, 1], name='Q_card_target')
         self.q_x_target = tf.placeholder(tf.float32, [None, 1], name='Q_x_target')
         self.q_y_target = tf.placeholder(tf.float32, [None, 1], name='Q_y_target')
@@ -155,24 +163,33 @@ class DDPG(object):
 
         # eval_net
         with tf.variable_scope('eval_net'):
-            self.card_prob, self.card_value, self.loc_x, self.loc_y, self.q_card_eval, self.q_x_eval, self.q_y_eval = \
+            self.action_prob, self.card_prob, self.card_value, self.loc_x, self.loc_y, \
+            self.q_has_action_eval, self.q_card_eval, self.q_x_eval, self.q_y_eval = \
                 self._build_actor_critic_net(self.s_img, self.s_card_elixir, is_train=True)
 
         with tf.variable_scope('loss'):
             reg_loss = tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
 
             # has card select
+            action_type = tf.argmax(self.action_prob, axis=-1, output_type=tf.int32)
             select_card = tf.argmax(self.card_value, axis=-1, output_type=tf.int32)
 
-            self.accuracy = tf.reduce_mean(tf.metrics.accuracy(select_card, self.card_action))
+            self.action_accuracy = tf.reduce_mean(tf.metrics.accuracy(self.has_action, action_type))
+            self.legal_action = tf.cast(self.has_action * action_type, dtype=tf.float32)
+            self.card_accuracy = tf.reduce_sum(
+                tf.cast(tf.equal(self.card_action, select_card), tf.float32) * self.legal_action) \
+                                 / (tf.reduce_sum(self.legal_action) + 0.001)
 
-            same_card = tf.cast(tf.equal(select_card, self.card_action), dtype=tf.float32) * \
-                        tf.cast(tf.not_equal(self.card_action, 0), dtype=tf.float32)
+            same_card = tf.cast(tf.equal(select_card, self.card_action), dtype=tf.float32) * self.legal_action
 
-            neg_log_prob = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.card_value,
-                                                                          labels=self.card_action)
+            action_neg_log_prob = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.action_prob,
+                                                                                 labels=self.has_action)
 
-            card_loss = tf.reduce_mean(neg_log_prob * self.action_reward)
+            card_neg_log_prob = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.card_value,
+                                                                               labels=self.card_action)
+
+            action_loss = tf.reduce_mean(action_neg_log_prob * self.action_reward)
+            card_loss = tf.reduce_mean(card_neg_log_prob * self.action_reward * self.legal_action)
 
             loc_x_loss = -tf.reduce_mean(
                 tf.squared_difference(self.loc_x, self.x_action) * same_card * self.action_reward)
@@ -180,28 +197,35 @@ class DDPG(object):
                 tf.squared_difference(self.loc_y, self.y_action) * same_card * self.action_reward)
 
             self.abs_errors = tf.reduce_sum(tf.abs(self.q_card_target - self.q_card_eval), axis=1) + \
-                              tf.reduce_sum(tf.abs(self.q_x_target - self.q_x_eval), axis=1) * same_card + \
-                              tf.reduce_sum(tf.abs(self.q_y_target - self.q_y_eval), axis=1) * same_card
+                              tf.reduce_sum(tf.abs(self.q_x_target - self.q_x_eval),
+                                            axis=1) * same_card * self.legal_action + \
+                              tf.reduce_sum(tf.abs(self.q_y_target - self.q_y_eval),
+                                            axis=1) * same_card * self.legal_action
 
-            q_card_loss = tf.reduce_mean((tf.squared_difference(self.q_card_target, self.q_card_eval)))
+            q_action_loss = tf.reduce_mean((tf.squared_difference(self.q_has_action_target, self.q_has_action_eval)))
+            q_card_loss = tf.reduce_mean(
+                (tf.squared_difference(self.q_card_target, self.q_card_eval) * self.legal_action))
 
             q_x_loss = tf.reduce_mean(tf.squared_difference(self.q_x_target, self.q_x_eval) * same_card)
             q_y_loss = tf.reduce_mean(tf.squared_difference(self.q_y_target, self.q_y_eval) * same_card)
 
-            self.a_loss = card_loss + loc_x_loss + loc_y_loss + reg_loss / 2
+            self.a_loss = action_loss + card_loss + loc_x_loss + loc_y_loss + reg_loss / 2
 
-            self.c_loss = q_card_loss + q_x_loss + q_y_loss + reg_loss / 2
+            self.c_loss = q_action_loss + q_card_loss + q_x_loss + q_y_loss + reg_loss / 2
 
             self.loss = self.c_loss
 
             if self.brain_type != self.BrainType["runner"]:
-                tf.summary.scalar(name="accuracy", tensor=self.accuracy)
+                tf.summary.scalar(name="action_accuracy", tensor=self.action_accuracy)
+                tf.summary.scalar(name="card_accuracy", tensor=self.card_accuracy)
                 tf.summary.scalar(name='loss', tensor=self.loss)
                 tf.summary.scalar(name='actor_loss', tensor=self.a_loss)
                 tf.summary.scalar(name='critic_loss', tensor=self.c_loss)
+                tf.summary.scalar(name='action_loss', tensor=action_loss)
                 tf.summary.scalar(name='card_loss', tensor=card_loss)
                 tf.summary.scalar(name='loc_x_loss', tensor=loc_x_loss)
                 tf.summary.scalar(name='loc_y_loss', tensor=loc_y_loss)
+                tf.summary.scalar(name='action_q_loss', tensor=q_action_loss)
                 tf.summary.scalar(name='card_q_loss', tensor=q_card_loss)
                 tf.summary.scalar(name='loc_x_q_loss', tensor=q_x_loss)
                 tf.summary.scalar(name='loc_y_q_loss', tensor=q_y_loss)
@@ -214,7 +238,7 @@ class DDPG(object):
 
         # target_net
         with tf.variable_scope('target_net'):
-            _, _, _, _, self.q_card_next, self.q_x_next, self.q_y_next = \
+            _, _, _, _, _, self.q_has_action_next, self.q_card_next, self.q_x_next, self.q_y_next = \
                 self._build_actor_critic_net(self.s_img_, self.s_card_elixir_, False)
 
         vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
@@ -252,14 +276,15 @@ class DDPG(object):
         uniform = np.random.uniform()
         if uniform <= 0.6:
             # forward feed the observation and get q value for every actions
-            card_prob, card, loc_x, loc_y = self.sess.run([self.card_prob, self.card_value, self.loc_x, self.loc_y],
-                                                          feed_dict={self.s_img: [observation[1]],
-                                                                     self.s_card_elixir: [
-                                                                         parse_running_state(observation[2])]})
+            card_prob, has_action, card, loc_x, loc_y = self.sess.run(
+                [self.card_prob, self.has_action, self.card_value, self.loc_x, self.loc_y],
+                feed_dict={self.s_img: [observation[1]],
+                           self.s_card_elixir: [parse_running_state(observation[2])]})
+
             card_index = np.argmax(card_prob[0])
-            print("dqn play:" + str(card_index) + " " + str(card_prob[0][card_index]))
-            if card_index != 0:
-                action = [card_index, loc_x[0][0], loc_y[0][0]]
+            print("dqn play:" + str(has_action) + "  " + str(card_index) + " " + str(card_prob[0][card_index]))
+            if has_action != 0:
+                action = [card_index + 1, loc_x[0][0], loc_y[0][0]]
                 print("dqn play has action:" + str(action))
             else:
                 action = [0, 0, 0]
@@ -344,9 +369,10 @@ class DDPG(object):
         card_type_action = [self.memory.action_dict[item][0] for item in batch_memory]
         y_action = [self.memory.action_dict[item][2] for item in batch_memory]
         reward = np.array([self.memory.reward_dict[item] for item in batch_memory])
-        card_action = np.array([[card_type_action[i], x_action[i], y_action[i]] for i in range(len(card_type_action))])
-
-        return imgs, states, card_action, reward, next_imgs, next_states
+        card_action = np.array(
+            [[max(card_type_action[i] - 1, 0), x_action[i], y_action[i]] for i in range(len(card_type_action))])
+        has_action = np.array([card_type_action[i] > 0 for i in range(len(card_type_action))]).astype(np.int32)
+        return imgs, states, has_action, card_action, reward, next_imgs, next_states
 
     def _discount_and_norm_rewards(self, reward):
         # discount episode rewards
@@ -372,17 +398,20 @@ class DDPG(object):
 
             while True:
                 tree_idx, batch_memory, weights = self.memory.sample(self.batch_size)
-                imgs, states, actions, reward, next_imgs, next_states \
+                imgs, states, has_action, actions, reward, next_imgs, next_states \
                     = self._prepare_data(batch_memory)
-                undo_count = np.sum([1 for action in actions if action[0] == 0])
-                if undo_count < self.batch_size / 3:
+                undo_count = np.sum(has_action)
+                if undo_count >= self.batch_size / 2:
                     break
 
             states_vector = [parse_running_state(state) for state in states]
             next_states_vector = [parse_running_state(state) for state in next_states]
 
-            q_card_next, q_card_eval, q_x_next, q_x_eval, q_y_next, q_y_eval = self.sess.run(
-                [self.q_card_next, self.q_card_eval, self.q_x_next, self.q_x_eval, self.q_y_next, self.q_y_eval],
+            q_has_action_next, q_has_action_eval, q_card_next, q_card_eval, q_x_next, q_x_eval, q_y_next, q_y_eval = self.sess.run(
+                [self.q_has_action_next, self.q_has_action_eval,
+                 self.q_card_next, self.q_card_eval,
+                 self.q_x_next, self.q_x_eval,
+                 self.q_y_next, self.q_y_eval],
                 feed_dict={self.s_img_: next_imgs,
                            self.s_card_elixir_: next_states_vector,
                            self.s_img: imgs,
@@ -391,16 +420,18 @@ class DDPG(object):
                            self.x_action: actions[:, 1],
                            self.y_action: actions[:, 2]})
 
+            q_has_action_target = q_has_action_eval.copy()
             q_card_target = q_card_eval.copy()
             q_x_target = q_x_eval.copy()
             q_y_target = q_y_eval.copy()
 
-            reward = self._discount_and_norm_rewards(reward)
+            # reward = self._discount_and_norm_rewards(reward)
 
             for i in range(len(q_card_target)):
                 action_item = actions[i]
-                q_card_target[i] = reward[i] + self.gamma * q_card_next[i]
+                q_has_action_target[i] = reward[i] + self.gamma * q_has_action_next[i]
                 if action_item[0] != 0:
+                    q_card_target[i] = reward[i] + self.gamma * q_card_next[i]
                     state_card = states[i][:4]
                     state_available = states[i][4:8]
                     available_card = state_card * state_available
@@ -408,15 +439,17 @@ class DDPG(object):
                         q_x_target[i] = reward[i] + self.gamma * q_x_next[i]
                         q_y_target[i] = reward[i] + self.gamma * q_y_next[i]
 
-            _, _, _, abs_errors, loss, summary = self.sess.run(
-                [self._train_actor_op, self._train_critic_op, self.accuracy,
-                 self.abs_errors, self.loss, self.merge_summary],
+            _, _, _, _, abs_errors, loss, summary, legal_action = self.sess.run(
+                [self._train_actor_op, self._train_critic_op, self.action_accuracy, self.card_accuracy,
+                 self.abs_errors, self.loss, self.merge_summary, self.legal_action],
                 feed_dict={self.s_img: imgs,
                            self.s_card_elixir: states_vector,
+                           self.q_has_action_target: q_has_action_target,
                            self.q_card_target: q_card_target,
                            self.q_x_target: q_x_target,
                            self.q_y_target: q_y_target,
                            self.action_reward: reward,
+                           self.has_action: has_action,
                            self.card_action: actions[:, 0].astype(np.int32),
                            self.x_action: actions[:, 1],
                            self.y_action: actions[:, 2]
@@ -431,7 +464,8 @@ class DDPG(object):
             if self.learn_step_counter > 0 and self.learn_step_counter % 25 == 0:
                 print('\nSave weights {:d}\n'.format(self.learn_step_counter))
                 self.saver.save(self.sess, self.model_save_path, global_step=self.learn_step_counter)
-            print("Train spent {:d}  {:f}".format(self.learn_step_counter, time.time() * 1000 - start_time))
+            print("Train spent {:d}  {:f} {:f}".format(self.learn_step_counter, time.time() * 1000 - start_time,
+                                                       np.sum(legal_action)))
 
     def record_battle_result(self):
         with self.sess.as_default():

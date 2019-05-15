@@ -22,7 +22,7 @@ class ClashRoyal:
             "friend_battle_host": 1,
             "friend_battle_guest": 2}
 
-    def __init__(self, root, device_id, mode=MODE["battle"], name="gamer0"):
+    def __init__(self, root, device, mode=MODE["battle"], name="gamer0"):
         super().__init__()
         w = 1080
 
@@ -36,7 +36,8 @@ class ClashRoyal:
         self.height = 62 * 10
 
         ll = ctypes.cdll.LoadLibrary
-        self.device_id = device_id
+        self.device_id = device.device_id
+        self.device = device
         self.mode = mode
         self.name = name
         self.root = root
@@ -197,35 +198,28 @@ class ClashRoyal:
         if self.mode == self.MODE["battle"] and result.index == 2:
             if self.retry > 25 and self.retry % 10 == 0:
                 self.retry = 0
-                cmd = "adb -s {:s} shell input tap 344 1246".format(self.device_id)
-                self.p.apply_async(execute_cmd, args={cmd})
+                self.device.tap_button([344, 1246])
 
         elif self.mode == self.MODE["friend_battle_host"] and result.index == 3:
             if result.is_grey:
                 if self.retry > 0 and self.retry % 5 == 0:
                     self.retry = 0
                     # normal 548 544     548 944
-                    cmd = "adb  -s {:s} shell input tap 548 944".format(self.device_id)
-                    self.p.apply_async(execute_cmd, args={cmd})
+                    self.device.tap_button([548, 944])
 
             else:
                 if result.purple_loc[0] != 0:
                     if self.retry > 0 and self.retry % 5 == 0:
                         self.retry = 0
-                        cmd = "adb -s {:s} shell input tap {:d} {:d}".format(self.device_id,
-                                                                             result.purple_loc[0],
-                                                                             result.purple_loc[1])
-                        self.p.apply_async(execute_cmd, args={cmd})
+                        self.device.tap_button([result.purple_loc[0], result.purple_loc[1]])
 
         elif self.mode == self.MODE["friend_battle_guest"] and result.index == 3:
             if not result.is_grey:
                 if result.yellow_loc[0] != 0:
                     if self.retry > 0 and self.retry % 5 == 0:
                         self.retry = 0
-                        cmd = "adb -s {:s} shell input tap {:d} {:d}".format(self.device_id,
-                                                                             result.yellow_loc[0],
-                                                                             result.yellow_loc[1])
-                        self.p.apply_async(execute_cmd, args={cmd})
+                        self.device.tap_button([result.yellow_loc[0], result.yellow_loc[1]])
+
         self.retry += 1
 
     def _record_reward(self, result, img):
@@ -282,8 +276,8 @@ class ClashRoyal:
     def _finish_game(self):
         if self.retry % 50 == 0:
             self.retry = 0
-            cmd = "adb -s {:s} shell input tap 536 1684".format(self.device_id)
-            self.p.apply_async(execute_cmd, args={cmd})
+            self.device.tap_button([536, 1684])
+
         self.retry += 1
 
     def _update_reward(self, reward_value, index):
@@ -309,12 +303,7 @@ class ClashRoyal:
                     loc_x = int(action[1] * self.width * 2) + self.offset_w * 2
                     loc_y = int(action[2] * self.height * 2) + self.offset_h * 2
                     if self.real_time:
-                        cmd = "adb -s {:s} shell input swipe {:d} {:d} {:d} {:d} 300".format(self.device_id,
-                                                                                             card[0],
-                                                                                             card[1],
-                                                                                             loc_x,
-                                                                                             loc_y)
-                        self.p.apply_async(execute_cmd, args={cmd})
+                        self.device.swipe([card[0], card[1], loc_x, loc_y])
             else:
                 self._update_reward(-0.05, index)
             self.actions[index] = action
