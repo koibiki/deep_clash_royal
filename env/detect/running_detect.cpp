@@ -49,7 +49,6 @@ RunningResult RunningDetect::detect_running(Mat &src, int frame_index) {
         result.isRunning = true;
         result.opp_crown = opp_crown == -1 ? pre_opp_crown : opp_crown;
         result.mine_crown = mine_crown == -1 ? pre_mine_crown : mine_crown;
-
     }
     return result;
 }
@@ -111,18 +110,18 @@ int RunningDetect::get_most_possible_num(Mat &src, bool is_opp) {
     float max_similar_value = -1;
     int possible_num = -1;
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 6; i++) {
         string pattern_path = (is_opp ? opp_patterns_root : mine_patterns_root) + to_string(i) + ".jpg";
         Mat pattern = cv::imread(pattern_path, cv::IMREAD_GRAYSCALE);
 
         float similar_value = similar_percent(src, pattern);
         if (max_similar_value < similar_value) {
             max_similar_value = similar_value;
-            possible_num = i < 2 ? i : 2;
+            possible_num = i / 2;
         }
     }
-    //cout << "value:" << possible_num << "     similar value:" << max_similar_value << endl;
-    if (max_similar_value >= 0.75) {
+    cout << "value:" << possible_num << "     similar value:" << max_similar_value << endl;
+    if (max_similar_value >= 0.70) {
         return possible_num;
     } else {
         return -1;

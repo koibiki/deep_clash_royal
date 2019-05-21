@@ -14,8 +14,10 @@ bool CardDetect::load_model(string mode_path) {
     this->net = cv::dnn::readNetFromTensorflow(mode_path);
     if (this->net.empty()) {
         cout << "Card net load fail." << endl;
+        return false;
     } else {
         cout << "Card net load success." << endl;
+        return true;
     }
 }
 

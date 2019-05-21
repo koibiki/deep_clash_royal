@@ -39,7 +39,7 @@ public:
 private:
     bool debug = false;
 
-    float length_thresh = 0.05;
+    float length_thresh = 0.05f;
 
     cv::Mat clip_mat(Mat &src);
 

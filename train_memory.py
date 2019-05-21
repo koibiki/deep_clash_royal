@@ -1,15 +1,17 @@
-from brain.dqn import DQN
+from brain.policy import PolicyGradient
+from device.emulator import Emulator
+from device.mobile import Mobile
 from game.clash_royal import ClashRoyal
 
 # root = "/home/chengli/data/gym_data/clash_royal"
-root = "/home/holaverse/work/07battle_filed/clash_royal"
+root = "D:\\gym_data\\clash_royal"
 
-clash_royal = ClashRoyal(root, device_id="cd9faa7f", name="trainer")
+host = ClashRoyal(root, None, name="trainer")
 
-base_brain = DQN(clash_royal, DQN.BrainType["trainer"])
+base_brain = PolicyGradient(host.img_shape, host.state_shape, PolicyGradient.BrainType["trainer"], "trainer")
 
 base_brain.load_memory(root)
-for i in range(5000):
+for i in range(5000000):
     base_brain.learn()
     if i > 0 and i % 100 == 0:
         base_brain.load_memory(root)

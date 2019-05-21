@@ -12,6 +12,9 @@ result ClashRoyalAgent::detect_frame(py_mat mat, result r) {
     cv::TickMeter tm;
     tm.start();
     Mat src = transfer_mat(mat);
+    if (debug) {
+        cv::imshow("origin", src);
+    }
     result detect_result = detect_mat(src, r);
     tm.stop();
     detect_result.milli = static_cast<float>(tm.getTimeMilli());

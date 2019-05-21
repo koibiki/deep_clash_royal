@@ -69,10 +69,11 @@ def parse_running_state(state):
 
 
 def parse_card_state(card_type, available):
-    card_type_state = np.zeros(92 * 2, dtype=np.float32)
+    card_type_state = np.zeros(1 + 92 * 3, dtype=np.float32)
+    card_type_state[0] = 1
     for i in range(4):
         if card_type[i] != 0:
-            # card_type_state[card_type[i] - 1] = 1
-            card_type_state[card_type[i] - 1] = available[i]
-            card_type_state[92 + card_type[i] - 1] = elixir_dict[card_dict[card_type[i]]]
+            card_type_state[card_type[i]] = available[i]
+            card_type_state[92 + 1 + card_type[i] - 1] = 1
+            card_type_state[92 * 2 + 1 + card_type[i] - 1] = elixir_dict[card_dict[card_type[i]]]
     return card_type_state

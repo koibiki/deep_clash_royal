@@ -59,8 +59,6 @@ typedef struct Result {
 
 class ClashRoyalAgent {
 private:
-    cv::Mat transfer_mat(py_mat mat);
-
     RunningDetect runningDetect;
 
     FinishDetect finishDetect;
@@ -98,6 +96,10 @@ private:
     int start_time;
 
     int finish_count = 0;
+
+    bool debug = false;
+
+    cv::Mat transfer_mat(py_mat mat);
 
 public:
 

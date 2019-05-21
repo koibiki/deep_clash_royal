@@ -19,7 +19,7 @@ int main() {
 
     ButtonDetect buttonDetect;
 
-    Mat img = cv::imread("../375.jpg");
+    Mat img = cv::imread("../grey.jpg");
 
     finishDetect.detect_finish(img, 0);
 
@@ -33,11 +33,9 @@ int main() {
     cv::circle(img, cv::Point(buttonResult.yellow_button_loc[0], buttonResult.yellow_button_loc[1]), 3, color, 10);
 
 
-    cv::resize(img, img, cv::Size(), 0.5, 0.5);
+    cv::resize(img, img, cv::Size(540, 960));
 
-    cv::imshow("ss", img);
 
-    cv::waitKey(0);
     const MenuResult &menuResult = menu.detect_tap_location(img, 0);
 
     cout << menuResult.isGrey << endl;

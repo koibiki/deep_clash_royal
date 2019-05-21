@@ -303,6 +303,5 @@ int Menu::get_rect_height(Mat &src, int index, int color_index) {
 
 Menu::Menu() {
     cout << "init Menu." << endl;
-
 }
 

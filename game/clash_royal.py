@@ -1,8 +1,8 @@
 import ctypes
 import os
 import os.path as osp
+import sys
 import time
-from multiprocessing.pool import Pool
 
 import cv2
 import numpy as np
@@ -10,7 +10,6 @@ import numpy as np
 from config import CARD_DICT
 from game.parse_result import parse_frame_state
 from utils.c_lib_utils import Result, STATE_DICT, convert2pymat
-from utils.cmd_utils import execute_cmd
 
 """
 仅支持 1920 * 1080 分辨率的屏幕
@@ -35,8 +34,7 @@ class ClashRoyal:
         self.width = 1080 // 2 - self.offset_w * 2
         self.height = 62 * 10
 
-        ll = ctypes.cdll.LoadLibrary
-        self.device_id = device.device_id
+        self.device_id = device.device_id if device is not None else ""
         self.device = device
         self.mode = mode
         self.name = name
@@ -48,21 +46,25 @@ class ClashRoyal:
         self.game_finish = False
         self.frame_count = 0
         self.log = True
-        self.p = Pool(6)
         self.retry = 0
         self.card_choices = [[340, 1720], [560, 1702], [738, 1698], [938, 1718]]
         self.n_card_actions = 93
         self.img_shape = (256, 192, 3 * 4)
         # 92种card是否可用 92种card消耗圣水量 (我方血量 对方血量) 剩余圣水量 耗时 双倍圣水 即死
-        self.state_shape = 92 * 2 + 2 + 1 + 1 + 1 + 1
+        self.state_shape = 1 + 92 * 3 + 2 + 1 + 1 + 1 + 1
 
         self.memory_record = []
         self.rate_of_winning = []
         self.reward_mean = []
-        self.lib = ll("./lib/libc_opencv.so")
+        if sys.platform == 'win32':
+            self.lib = ctypes.cdll.LoadLibrary("D:\\\\PyCharmProjects\\\\deep_clash_royal\\\\lib\\\\libc_opencv.dll")
+        else:
+            self.lib = ctypes.cdll.LoadLibrary("./lib/libc_opencv.so")
+
         self.lib.detect_frame.restype = Result
 
     def _init_game(self, gameId):
+        print("init:" + str(gameId))
         self.game_start = True
         self.game_finish = False
         self.frame_count = 0
@@ -150,15 +152,15 @@ class ClashRoyal:
             return
         self.running_frame_count += 1
         self.skip_step = self.skip_step - 1 if self.skip_step > 0 else 0
-        reward = -0.01
+        reward = 0
         if result.opp_crown > self.pre_opp_crown:
-            reward = -0.5
+            reward = -0.6
             self.pre_opp_crown = result.opp_crown
         if result.mine_crown > self.pre_mine_crown:
-            reward = 0.3
+            reward = 0.6
             self.pre_mine_crown = result.mine_crown
 
-        if reward != -0.01:
+        if reward != 0:
             self._update_reward(reward, result.frame_index - 5)
         else:
             self._update_reward(reward, result.frame_index)
@@ -193,7 +195,7 @@ class ClashRoyal:
             self.game_start = False
             self.game_finish = False
         if not self.game_start:
-            self._init_game(int(time.time() * 1000))
+            self._init_game(int(str(int(time.time() * 100))[-9:]))
 
         if self.mode == self.MODE["battle"] and result.index == 2:
             if self.retry > 25 and self.retry % 10 == 0:
@@ -205,7 +207,7 @@ class ClashRoyal:
                 if self.retry > 0 and self.retry % 5 == 0:
                     self.retry = 0
                     # normal 548 544     548 944
-                    self.device.tap_button([548, 944])
+                    self.device.tap_button([548, 544])
 
             else:
                 if result.purple_loc[0] != 0:
@@ -281,7 +283,7 @@ class ClashRoyal:
         self.retry += 1
 
     def _update_reward(self, reward_value, index):
-        if self.log and reward_value != -0.01:
+        if self.log and reward_value != 0:
             print("update  step {}  reward {:f} ".format(index, reward_value) + (
                 "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
                 if reward_value > 0 else "-------------------------------------------------------------------------"))
@@ -298,7 +300,7 @@ class ClashRoyal:
                     self._update_reward(-0.05, index)
                 else:
                     self.skip_step = 5
-                    self._update_reward(0.06, index)
+                    self._update_reward(0.05, index)
                     card = self.card_choices[card_index]
                     loc_x = int(action[1] * self.width * 2) + self.offset_w * 2
                     loc_y = int(action[2] * self.height * 2) + self.offset_h * 2
