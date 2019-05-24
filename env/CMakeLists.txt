@@ -16,7 +16,7 @@ add_library(c_opencv SHARED
         detect/button_detect.cpp
         dnn/elixir_detect.cpp
         dnn/card_detect.cpp
-        )
+        dnn/hp_detect.cpp dnn/hp_detect.h)
 
 include_directories(./include)
 

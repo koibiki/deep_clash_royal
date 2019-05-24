@@ -5,6 +5,7 @@
 #include "detect/menu_detect.h"
 #include "dnn/elixir_detect.h"
 #include "detect/finish_detect.h"
+#include "dnn/hp_detect.h"
 #include "agent.h"
 
 using namespace cv;
@@ -17,6 +18,7 @@ int main() {
 
     FinishDetect finishDetect;
 
+    HpDetect hpDetect;
 
     ElixirDetect elixirDetect;
 
@@ -29,6 +31,13 @@ int main() {
 
     int gameId = 10080;
     clashRoyalAgent.init_agent(0);
+
+    Mat img = cv::imread("D:\\gym_data\\clash_royal\\836200159\\running\\" + to_string(i) + ".jpg");
+    cv::resize(img, img, cv::Size(540, 960));
+
+    hpDetect.detect_hp()
+    
+
 
     for (int i = 0; i < 650; i++) {
 

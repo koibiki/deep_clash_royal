@@ -3,7 +3,7 @@ import numpy as np
 
 mate_color_dict = {
     "red": [[200, 255], [170, 230], [170, 230]],
-    "blue": [[170, 220], [170, 235], [200, 255]],
+    "blue": [[140, 220], [170, 235], [200, 255]],
     "black": [[0, 50], [0, 50], [0, 50]]
 }
 
@@ -27,7 +27,7 @@ def binary_thresh_pic(img, color_keys):
     return bg
 
 
-imread = cv2.imread("G:\\\\PyCharmProjects\\\\deep_clash_royal\\\\sample\\\\84.jpg")
+imread = cv2.imread("D:\\\\PyCharmProjects\\\\deep_clash_royal\\\\sample\\\\84.jpg")
 
 h, w, c = imread.shape
 
@@ -39,7 +39,7 @@ mine_throne_start_h = h // 2 + 214
 mine_throne_end_h = mine_throne_start_h + 15
 opp_throne = imread[opp_throne_start_h:opp_throne_end_h, throne_start_w:throne_end_w, :]
 cv2.imshow("opp", opp_throne)
-cv2.imshow("opp_t", binary_thresh_pic(opp_throne, ["red", "black"]))
+cv2.imshow("opp_t", binary_thresh_pic(opp_throne, ["red"]))
 mine_throne = imread[mine_throne_start_h:mine_throne_end_h, throne_start_w:throne_end_w, :]
 cv2.imshow("mine", mine_throne)
 
@@ -53,10 +53,10 @@ mine_start_h = h // 2 + 109
 mine_end_h = mine_start_h + 15
 opp_left = imread[opp_start_h:opp_end_h, left_start_w:left_end_w, :]
 cv2.imshow("left_opp", opp_left)
-cv2.imshow("opp_t_l", binary_thresh_pic(opp_left, ["red", "black"]))
+cv2.imshow("opp_t_l", binary_thresh_pic(opp_left, ["red"]))
 mine_left = imread[mine_start_h:mine_end_h, left_start_w:left_end_w, :]
 cv2.imshow("left_mine", mine_left)
-cv2.imshow("mine_t_l", binary_thresh_pic(mine_left, ["blue", "black"]))
+cv2.imshow("mine_t_l", binary_thresh_pic(mine_left, ["blue"]))
 opp_right = imread[opp_start_h:opp_end_h, right_start_w:right_end_w, :]
 cv2.imshow("right_opp", opp_right)
 
