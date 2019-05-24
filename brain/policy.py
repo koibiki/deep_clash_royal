@@ -96,7 +96,8 @@ class PolicyGradient(BaseBrain):
         with tf.variable_scope('actor', ):
             card_value = tf.layers.dense(gloabel_state, 93, name="card_value")
 
-            unavaiable_card_offset = tf.cast(tf.equal(avaiable_card, 0), dtype=tf.float32) * -999
+            unavaiable_card_offset = tf.cast(tf.equal(avaiable_card, 0), dtype=tf.float32) * \
+                                     (tf.reshape(card_value[:, 0], (-1, 1)))
 
             card_value = card_value * avaiable_card + unavaiable_card_offset
 
@@ -213,7 +214,7 @@ class PolicyGradient(BaseBrain):
 
     def choose_action(self, observation):
         uniform = np.random.uniform()
-        if uniform <= 0.01:
+        if uniform <= 0.5:
             # forward feed the observation and get q value for every actions
             card_prob, card_value, loc_x, loc_y, avaiable_card = self.sess.run(
                 [self.card_prob, self.card_value, self.loc_x, self.loc_y, self.avaiable_card],
@@ -228,8 +229,10 @@ class PolicyGradient(BaseBrain):
             print("dqn play:" + str(card_index) + " " + str(card_prob[0][card_index]) + " " + str(card_list)
                   + " " + str(avaiable_card_index))
             if card_index != 0:
-                x = np.clip(np.random.normal(loc_x[0][0], 0.1), 0, 1)
-                y = np.clip(np.random.normal(loc_y[0][0], 0.1), 0, 1)
+                # x = np.clip(np.random.normal(loc_x[0][0], 0.1), 0, 1)
+                # y = np.clip(np.random.normal(loc_y[0][0], 0.1), 0, 1)
+                x = np.random.uniform()
+                y = np.random.uniform()
                 action = [card_index, x, y]
                 print("dqn play has action:" + str(action) + "#######################################")
             else:

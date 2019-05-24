@@ -40,7 +40,7 @@ class ClashRoyal:
         self.name = name
         self.root = root
         self.record = True
-        self.scale = True
+        self.scale = False
         self.real_time = True
         self.game_start = False
         self.game_finish = False
@@ -57,7 +57,7 @@ class ClashRoyal:
         self.rate_of_winning = []
         self.reward_mean = []
         if sys.platform == 'win32':
-            self.lib = ctypes.cdll.LoadLibrary("D:\\\\PyCharmProjects\\\\deep_clash_royal\\\\lib\\\\libc_opencv.dll")
+            self.lib = ctypes.cdll.LoadLibrary("G:\\\\PyCharmProjects\\\\deep_clash_royal\\\\lib\\\\libc_opencv.dll")
         else:
             self.lib = ctypes.cdll.LoadLibrary("./lib/libc_opencv.so")
 

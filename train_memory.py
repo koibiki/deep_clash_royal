@@ -4,7 +4,7 @@ from device.mobile import Mobile
 from game.clash_royal import ClashRoyal
 
 # root = "/home/chengli/data/gym_data/clash_royal"
-root = "D:\\gym_data\\clash_royal"
+root = "F:\\gym_data\\clash_royal"
 
 host = ClashRoyal(root, None, name="trainer")
 

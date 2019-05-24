@@ -73,7 +73,8 @@ class DDPG(BaseBrain):
             # out = resnet_v2.resnet_v2_50(s_img)[1][scope + "/cnn/resnet_v2_50/block4"]
             out = build_mobilenetv2(s_img, is_train)
 
-            out = tf.layers.dropout(out, 0.5)
+            if is_train:
+                out = tf.layers.dropout(out, 0.5)
 
             battle_filed = tf.layers.conv2d(out, 1 + 92 * 2, (1, 1))
 
@@ -85,11 +86,11 @@ class DDPG(BaseBrain):
 
             filed_flatten = tf.layers.flatten(battle_filed)
 
-            env_state = s_card_elixir[:, 1 + 92 * 3:]
+            env_state = s_card_elixir[:, 92 * 3:]
 
-            card_state = s_card_elixir[:, 1:92 * 3 + 1]
+            card_state = s_card_elixir[:, :92 * 3]
 
-            avaiable_card = s_card_elixir[:, :92 + 1]
+            avaiable_card = s_card_elixir[:, :92]
 
             x_filed_state = tf.concat([x_flatten, env_state], axis=-1)
             y_filed_state = tf.concat([y_flatten, env_state], axis=-1)
@@ -100,7 +101,7 @@ class DDPG(BaseBrain):
 
         with tf.variable_scope('actor', ):
             card_value = tf.layers.dense(gloabel_state, 93, name="card_value")
-            unavaiable_card_offset = tf.cast(tf.equal(avaiable_card, 0), dtype=tf.float32) * -9999999
+            unavaiable_card_offset = tf.cast(tf.equal(avaiable_card, 0), dtype=tf.float32) * card_value[:, 0]
             card_value = card_value * avaiable_card + unavaiable_card_offset
 
             card_prob = tf.nn.softmax(card_value, name="card_prob")

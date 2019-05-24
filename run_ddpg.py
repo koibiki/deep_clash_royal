@@ -13,15 +13,15 @@ if __name__ == '__main__':
     i = 0
 
     # root = "/home/chengli/data/gym_data/clash_royal"
-    root = "D:\\gym_data\\clash_royal"
+    root = "F:\\gym_data\\clash_royal"
 
-    # device_id = "cd9faa7f"
-    device_id = "127.0.0.1:62001"
+    device_id = "cd9faa7f"
+    # device_id = "127.0.0.1:62001"
 
-    # host_address = "http://127.0.0.1:46539/device/" + device_id + "/video.flv"
+    host_address = "http://127.0.0.1:2224/device/" + device_id + "/video.flv"
 
-    # device = Mobile(device_id, host_address)
-    device = Emulator(device_id, "夜神模拟器")
+    device = Mobile(device_id, host_address)
+    # device = Emulator(device_id, "夜神模拟器")
 
     host = ClashRoyal(root, device, mode=ClashRoyal.MODE["battle"], name="host")
 
@@ -29,7 +29,7 @@ if __name__ == '__main__':
 
     while True:
 
-        frame = device.get_frame()
+        frame, state_code = device.get_frame()
 
         if frame is not None:
             host_observation = host.frame_step(frame)
@@ -42,4 +42,5 @@ if __name__ == '__main__':
                 brain.record_battle_result()
                 brain.load_model()
         else:
-            print("没有信号")
+            if state_code == -1:
+                print("没有信号")
