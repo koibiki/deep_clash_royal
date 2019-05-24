@@ -17,7 +17,7 @@
 #include "detect/button_detect.h"
 #include "dnn/elixir_detect.h"
 #include "dnn/card_detect.h"
-
+#include "dnn/hp_detect.h"
 
 static const int MENU_STATE = 0;
 
@@ -46,6 +46,8 @@ typedef struct Result {
     int card_type[4] = {0, 0, 0, 0};
     int available[4] = {0, 0, 0, 0};
     float prob[4] = {0.0, 0.0, 0.0, 0.0};
+    float opp_hp[3] = {0.0, 0.0, 0.0};
+    float mine_hp[3] = {0.0, 0.0, 0.0};
     int battle_result = -1;
     int frame_index = 0;
     int time;
@@ -66,6 +68,8 @@ private:
     ElixirDetect elixirDetect;
 
     CardDetect cardDetect;
+
+    HpDetect hpDetect;
 
     Menu menu;
 

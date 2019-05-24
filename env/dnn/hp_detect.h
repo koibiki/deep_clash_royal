@@ -9,6 +9,11 @@
 #include "../detect/detect.h"
 #include "opencv2/dnn.hpp"
 
+struct HpResult {
+    float opp_result[3] = {0, 0, 0};
+    float mine_result[3] = {0, 0, 0};
+};
+
 class HpDetect : protected BaseDetect {
 
 private:
@@ -20,7 +25,7 @@ private:
     };
 
     // opp_throne opp_left opp_right
-    Rect opp_hp_rects[3] = {{227, 14,  55, 15},
+    Rect opp_hp_rects[3] = {{277, 14,  55, 15},
                             {108, 132, 50, 15},
                             {392, 132, 50, 15}};
     Rect mine_hp_rects[3] = {{277, 694, 55, 15},
@@ -35,7 +40,7 @@ private:
     float opp_pre_hp[3] = {4008.f, 2534.f, 2534.f};
     float mine_pre_hp[3] = {4008.f, 2534.f, 2534.f};
 
-    bool has_num(Mat &src, int color_index);
+    Rect has_num(Mat &src, int color_index);
 
     int predict(Mat &src);
 
@@ -49,7 +54,7 @@ public:
 
     HpDetect();
 
-    int detect_hp(Mat &src);
+    HpResult detect_hp(Mat &src);
 
     void reset();
 

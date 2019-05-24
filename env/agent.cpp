@@ -46,6 +46,13 @@ result ClashRoyalAgent::detect_mat(Mat src, result r) {
                 r.mine_crown = runningResult.mine_crown;
                 r.frame_index = frame_index++;
                 r.time = 0;
+                const HpResult &hpResult = hpDetect.detect_hp(src);
+                r.opp_hp[0] = hpResult.opp_result[0];
+                r.opp_hp[1] = hpResult.opp_result[1];
+                r.opp_hp[2] = hpResult.opp_result[2];
+                r.mine_hp[0] = hpResult.mine_result[0];
+                r.mine_hp[1] = hpResult.mine_result[1];
+                r.mine_hp[2] = hpResult.mine_result[2];
                 for (int i = 0; i < 4; i++) {
                     Mat card_mat = src(rects[i]);
                     const CardResult &cardResult = this->cardDetect.predict(card_mat);
@@ -85,6 +92,13 @@ result ClashRoyalAgent::detect_mat(Mat src, result r) {
             r.mine_crown = runningResult.mine_crown;
             r.frame_index = frame_index++;
             r.time = time(0) - start_time;
+            const HpResult &hpResult = hpDetect.detect_hp(src);
+            r.opp_hp[0] = hpResult.opp_result[0];
+            r.opp_hp[1] = hpResult.opp_result[1];
+            r.opp_hp[2] = hpResult.opp_result[2];
+            r.mine_hp[0] = hpResult.mine_result[0];
+            r.mine_hp[1] = hpResult.mine_result[1];
+            r.mine_hp[2] = hpResult.mine_result[2];
             for (int i = 0; i < 4; i++) {
                 Mat card_mat = src(rects[i]);
                 const CardResult &cardResult = this->cardDetect.predict(card_mat);
@@ -139,6 +153,7 @@ void ClashRoyalAgent::init_agent(int gameId) {
     this->currentGameState = MENU_STATE;
     this->gameId = gameId;
     this->cardDetect.reset();
+    this->hpDetect.reset();
     this->elixirDetect.reset();
     for (int i = 0; i < 4; i++) {
         this->pre_type[i] = 0;

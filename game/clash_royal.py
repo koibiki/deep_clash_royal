@@ -148,6 +148,12 @@ class ClashRoyal:
                                                                    result.prob[2],
                                                                    CARD_DICT[result.card_type[3]],
                                                                    result.prob[3], ))
+            print("hp:{:f}-{:f}-{:f}-{:f}-{:f}-{:f}".format(result.opp_hp[0],
+                                                            result.opp_hp[1],
+                                                            result.opp_hp[2],
+                                                            result.mine_hp[0],
+                                                            result.mine_hp[1],
+                                                            result.mine_hp[2], ))
         if result.frame_index < 0:
             return
         self.running_frame_count += 1

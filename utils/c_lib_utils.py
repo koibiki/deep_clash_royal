@@ -36,6 +36,8 @@ class Result(ctypes.Structure):
         ('card_type', ctypes.c_int * 4),
         ('available', ctypes.c_int * 4),
         ('prob', ctypes.c_float * 4),
+        ('opp_hp', ctypes.c_float * 3),
+        ('mine_hp', ctypes.c_float * 3),
         ('battle_result', ctypes.c_int),
         ('frame_index', ctypes.c_int),
         ('time', ctypes.c_int),
