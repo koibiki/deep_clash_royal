@@ -75,10 +75,10 @@ class ClashRoyal:
         self.error_dir = osp.join(self.root, "{:d}/error".format(gameId))
         self.running_dir = osp.join(self.root, "{:d}/running".format(gameId))
         self.finish_dir = osp.join(self.root, "{:d}/finish".format(gameId))
-        self.rewards = np.zeros(1500, dtype=np.object)
-        self.actions = np.zeros(1500, dtype=np.object)
-        self.imgs = np.zeros(1500, dtype=np.object)
-        self.states = np.zeros(1500, dtype=np.object)
+        self.rewards = []
+        self.actions = []
+        self.imgs = []
+        self.states = []
         self.pre_mine_crown = 0
         self.pre_opp_crown = 0
         self.memory_record.append(gameId)
@@ -148,25 +148,25 @@ class ClashRoyal:
                                                                    result.prob[2],
                                                                    CARD_DICT[result.card_type[3]],
                                                                    result.prob[3], ))
-            # print("hp:{:f}-{:f}-{:f}-{:f}-{:f}-{:f}".format(result.opp_hp[0],
-            #                                                 result.opp_hp[1],
-            #                                                 result.opp_hp[2],
-            #                                                 result.mine_hp[0],
-            #                                                 result.mine_hp[1],
-            #                                                 result.mine_hp[2], ))
+            print("hp:{:f}-{:f}-{:f}-{:f}-{:f}-{:f}".format(result.opp_hp[0],
+                                                            result.opp_hp[1],
+                                                            result.opp_hp[2],
+                                                            result.mine_hp[0],
+                                                            result.mine_hp[1],
+                                                            result.mine_hp[2], ))
         if result.frame_index < 0:
             return
         self.running_frame_count += 1
         self.skip_step = self.skip_step - 1 if self.skip_step > 0 else 0
 
         reward = 0
-        reward -= result.opp_hp[0] * 0.2
-        reward -= result.opp_hp[1] * 0.1
-        reward -= result.opp_hp[1] * 0.1
         reward += result.opp_hp[0] * 0.2
         reward += result.opp_hp[1] * 0.1
-        reward += result.opp_hp[1] * 0.1
-        self._update_reward(reward, result.frame_index)
+        reward += result.opp_hp[2] * 0.1
+        reward -= result.mine_hp[0] * 0.2
+        reward -= result.mine_hp[1] * 0.1
+        reward -= result.mine_hp[2] * 0.1
+        self._append_reward(reward, result.frame_index)
 
         if result.opp_crown > self.pre_opp_crown:
             self._update_reward(-0.6, result.frame_index - 5)
@@ -177,9 +177,9 @@ class ClashRoyal:
 
         state = parse_frame_state(result)
 
-        self.states[result.frame_index] = state
+        self.states.append(state)
         img_state = img[self.offset_h: self.offset_h + self.height, self.offset_w: - self.offset_w, :]
-        self.imgs[result.frame_index] = cv2.resize(img_state, (192, 256))
+        self.imgs.append(cv2.resize(img_state, (192, 256)))
 
         if self.record:
             img_path = osp.join(self.running_dir, "{:d}.jpg".format(result.frame_index))
@@ -261,7 +261,7 @@ class ClashRoyal:
                         f.write("\n")
                 with open(osp.join(self.root, str(self.game_id) + "/reward.txt"), "w") as f:
                     for i in range(len(self.rewards[:self.running_frame_count - 10])):
-                        f.write(str(i) + ":" + str(self.rewards[i]))
+                        f.write(str(i) + ":" + str(round(self.rewards[i], 1)))
                         f.write("\n")
 
                 old_path = osp.join(self.root, str(self.game_id))
@@ -299,6 +299,13 @@ class ClashRoyal:
                 if reward_value > 0 else "-------------------------------------------------------------------------"))
         self.rewards[index] += reward_value
 
+    def _append_reward(self, reward_value, index):
+        if self.log and reward_value != 0:
+            print("append  step {}  reward {:f} ".format(index, reward_value) + (
+                "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+                if reward_value > 0 else "-------------------------------------------------------------------------"))
+        self.rewards.append(reward_value)
+
     def step(self, observation, action):
         index = observation[0]
         if self.skip_step == 0 and action[0] != 0:
@@ -312,10 +319,10 @@ class ClashRoyal:
                     loc_y = int(action[2] * self.height * 2) + self.offset_h * 2
                     if self.real_time:
                         self.device.swipe([card[0], card[1], loc_x, loc_y])
-            self.actions[index] = action
+            self.actions.append(action)
         else:
             print("do nothing or skip step.")
-            self.actions[index] = [0, 0, 0]
+            self.actions.append([0, 0, 0])
 
     def _episode_statistics(self, result):
         skip_step = 10

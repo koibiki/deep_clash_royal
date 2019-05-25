@@ -214,7 +214,7 @@ class PolicyGradient(BaseBrain):
 
     def choose_action(self, observation):
         uniform = np.random.uniform()
-        if uniform <= 0.5:
+        if uniform <= 0.05:
             # forward feed the observation and get q value for every actions
             card_prob, card_value, loc_x, loc_y, avaiable_card = self.sess.run(
                 [self.card_prob, self.card_value, self.loc_x, self.loc_y, self.avaiable_card],
@@ -224,8 +224,8 @@ class PolicyGradient(BaseBrain):
             card_index = np.argmax(card_prob[0])
 
             avaiable_card_index = [i for i in range(93) if avaiable_card[0][i] != 0]
-
-            card_list = [item for item in card_value[0] if item > -9000000]
+            min_value = np.min(card_value)
+            card_list = [item for item in card_value[0] if item > min_value]
             print("dqn play:" + str(card_index) + " " + str(card_prob[0][card_index]) + " " + str(card_list)
                   + " " + str(avaiable_card_index))
             if card_index != 0:
@@ -238,7 +238,7 @@ class PolicyGradient(BaseBrain):
             else:
                 action = [0, 0, 0]
             print("dqn choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]))
-        elif uniform < 0.8:
+        elif uniform < 0.9:
             action = [0, 0, 0]
             print("random choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]))
         else:
