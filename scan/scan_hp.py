@@ -32,7 +32,7 @@ imread = cv2.imread("D:\\\\PyCharmProjects\\\\deep_clash_royal\\\\sample\\\\84.j
 h, w, c = imread.shape
 
 throne_start_w = w // 2 + 7
-throne_end_w = throne_start_w + 5 + 50
+throne_end_w = throne_start_w + 50
 opp_throne_start_h = h // 65
 opp_throne_end_h = opp_throne_start_h + 15
 mine_throne_start_h = h // 2 + 214
@@ -44,9 +44,9 @@ mine_throne = imread[mine_throne_start_h:mine_throne_end_h, throne_start_w:thron
 cv2.imshow("mine", mine_throne)
 
 left_start_w = w // 5
-left_end_w = left_start_w + 50
+left_end_w = left_start_w + 40
 right_start_w = w * 3 // 5 + 68
-right_end_w = right_start_w + 50
+right_end_w = right_start_w + 40
 opp_start_h = h // 8 + 12
 opp_end_h = opp_start_h + 15
 mine_start_h = h // 2 + 109

@@ -25,12 +25,12 @@ private:
     };
 
     // opp_throne opp_left opp_right
-    Rect opp_hp_rects[3] = {{277, 14,  55, 15},
-                            {108, 132, 50, 15},
-                            {392, 132, 50, 15}};
-    Rect mine_hp_rects[3] = {{277, 694, 55, 15},
-                             {108, 589, 50, 15},
-                             {392, 589, 50, 15}};
+    Rect opp_hp_rects[3] = {{277, 14,  50, 15},
+                            {108, 132, 40, 15},
+                            {392, 132, 40, 15}};
+    Rect mine_hp_rects[3] = {{277, 694, 50, 15},
+                             {108, 589, 40, 15},
+                             {392, 589, 40, 15}};
 
     cv::dnn::Net net;
 
@@ -40,7 +40,10 @@ private:
     float opp_pre_hp[3] = {4008.f, 2534.f, 2534.f};
     float mine_pre_hp[3] = {4008.f, 2534.f, 2534.f};
 
-    Rect has_num(Mat &src, int color_index);
+    Mat *opp_pre_mats;
+    Mat *mine_pre_mats;
+
+    Rect has_num(Mat &src);
 
     int predict(Mat &src);
 
@@ -53,6 +56,8 @@ private:
 public:
 
     HpDetect();
+
+    ~HpDetect();
 
     HpResult detect_hp(Mat &src);
 

@@ -40,7 +40,7 @@ class ClashRoyal:
         self.name = name
         self.root = root
         self.record = True
-        self.scale = False
+        self.scale = True
         self.real_time = True
         self.game_start = False
         self.game_finish = False
@@ -148,28 +148,32 @@ class ClashRoyal:
                                                                    result.prob[2],
                                                                    CARD_DICT[result.card_type[3]],
                                                                    result.prob[3], ))
-            print("hp:{:f}-{:f}-{:f}-{:f}-{:f}-{:f}".format(result.opp_hp[0],
-                                                            result.opp_hp[1],
-                                                            result.opp_hp[2],
-                                                            result.mine_hp[0],
-                                                            result.mine_hp[1],
-                                                            result.mine_hp[2], ))
+            # print("hp:{:f}-{:f}-{:f}-{:f}-{:f}-{:f}".format(result.opp_hp[0],
+            #                                                 result.opp_hp[1],
+            #                                                 result.opp_hp[2],
+            #                                                 result.mine_hp[0],
+            #                                                 result.mine_hp[1],
+            #                                                 result.mine_hp[2], ))
         if result.frame_index < 0:
             return
         self.running_frame_count += 1
         self.skip_step = self.skip_step - 1 if self.skip_step > 0 else 0
+
         reward = 0
+        reward -= result.opp_hp[0] * 0.2
+        reward -= result.opp_hp[1] * 0.1
+        reward -= result.opp_hp[1] * 0.1
+        reward += result.opp_hp[0] * 0.2
+        reward += result.opp_hp[1] * 0.1
+        reward += result.opp_hp[1] * 0.1
+        self._update_reward(reward, result.frame_index)
+
         if result.opp_crown > self.pre_opp_crown:
-            reward = -0.6
+            self._update_reward(-0.6, result.frame_index - 5)
             self.pre_opp_crown = result.opp_crown
         if result.mine_crown > self.pre_mine_crown:
-            reward = 0.6
+            self._update_reward(0.6, result.frame_index - 5)
             self.pre_mine_crown = result.mine_crown
-
-        if reward != 0:
-            self._update_reward(reward, result.frame_index - 5)
-        else:
-            self._update_reward(reward, result.frame_index)
 
         state = parse_frame_state(result)
 
@@ -293,7 +297,6 @@ class ClashRoyal:
             print("update  step {}  reward {:f} ".format(index, reward_value) + (
                 "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
                 if reward_value > 0 else "-------------------------------------------------------------------------"))
-
         self.rewards[index] += reward_value
 
     def step(self, observation, action):
@@ -302,18 +305,13 @@ class ClashRoyal:
             # 更新 选择了不可用 card 的 reward
             if action[0] in observation[3]:
                 card_index = np.argmax([action[0] == item for item in observation[3]])
-                if observation[4][card_index] == 0:
-                    self._update_reward(-0.05, index)
-                else:
+                if observation[4][card_index] != 0:
                     self.skip_step = 5
-                    self._update_reward(0.05, index)
                     card = self.card_choices[card_index]
                     loc_x = int(action[1] * self.width * 2) + self.offset_w * 2
                     loc_y = int(action[2] * self.height * 2) + self.offset_h * 2
                     if self.real_time:
                         self.device.swipe([card[0], card[1], loc_x, loc_y])
-            else:
-                self._update_reward(-0.05, index)
             self.actions[index] = action
         else:
             print("do nothing or skip step.")

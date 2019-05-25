@@ -33,10 +33,12 @@ int main() {
     clashRoyalAgent.init_agent(0);
 
     Mat img = cv::imread("G:\\PyCharmProjects\\deep_clash_royal\\env\\84.jpg");
+    Mat img1 = cv::imread("G:\\PyCharmProjects\\deep_clash_royal\\env\\277.jpg");
     cv::resize(img, img, cv::Size(540, 960));
+    cv::resize(img1, img1, cv::Size(540, 960));
 
     hpDetect.detect_hp(img);
-    
+    hpDetect.detect_hp(img1);
 
 
     for (int i = 0; i < 650; i++) {
