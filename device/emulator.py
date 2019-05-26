@@ -39,14 +39,14 @@ class Emulator(Device):
         self.offset_h = window_rect[1] + img_shape[0] - 2 - 960
 
     def get_frame(self):
+        cv2.waitKey(400)
         app = QApplication(sys.argv)
         screens = QApplication.screens()
         if len(screens) == 0:
             print("screen :0")
-            return None
+            return [None, -1]
         window = screens[0].grabWindow(self.hwnd)
         if win32gui.IsWindow(self.hwnd) == 1:
-            cv2.waitKey(400)
             window_rect = win32gui.GetWindowRect(self.hwnd)
             img = window.toImage()
             img_np = self.convertQImageToMat(img)
@@ -54,9 +54,9 @@ class Emulator(Device):
             img_np = img_np[-2 - 960:-2, 2:-2, 0:3].copy()
             if img_np.shape[0] != 960:
                 raise Exception("错误的分辨率")
-            return img_np
+            return [img_np, 1]
         else:
-            return None
+            return [None, -1]
 
     def convertQImageToMat(self, incomingImage):
         #  Converts a QImage into an opencv MAT format
