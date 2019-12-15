@@ -13,7 +13,7 @@ class Mobile(Device):
         self.address = address
         self.p = Pool(6)
         self.capture = None
-        self.count = 0
+        self.pre_time = time.time() * 1000
 
     def tap_button(self, button):
         cmd = "adb  -s {:s} shell input tap {:d} {:d}".format(self.device_id, button[0], button[1])
@@ -33,13 +33,14 @@ class Mobile(Device):
 
         state, img = self.capture.read()
         if state:
-            self.count += 1
-            if self.count % 20 == 0:
+            time_mill = time.time() * 1000
+            if time_mill - self.pre_time >= 500:
+                self.pre_time = time_mill
                 return [cv2.resize(img, (540, 960)), 0]
             else:
                 return [None, 0]
         else:
             self.capture.release()
             self.capture = None
-            time.sleep(30)
+            time.sleep(10)
             return [None, -1]

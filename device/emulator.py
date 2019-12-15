@@ -1,7 +1,7 @@
 from device.device import Device
 from multiprocessing.pool import Pool
 import sys
-
+import time
 import cv2
 import numpy as np
 import win32gui
@@ -20,6 +20,7 @@ class Emulator(Device):
         self.scale = 0.5
         self.hwnd = win32gui.FindWindow(None, window_name)
         self.mode = 0
+        self.pre_time = time.time() * 1000
 
     def tap_button(self, button):
         cmd = "adb  -s {:s} shell input tap {:d} {:d}".format(self.device_id, button[0] // 2, button[1] // 2)
@@ -39,7 +40,11 @@ class Emulator(Device):
         self.offset_h = window_rect[1] + img_shape[0] - 2 - 960
 
     def get_frame(self):
-        cv2.waitKey(400)
+        time_mill = time.time() * 1000
+        if time_mill - self.pre_time < 500:
+            return [None, 1]
+        else:
+            self.pre_time = time_mill
         app = QApplication(sys.argv)
         screens = QApplication.screens()
         if len(screens) == 0:
