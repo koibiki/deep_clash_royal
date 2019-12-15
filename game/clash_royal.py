@@ -1,6 +1,17 @@
 import ctypes
 import os
 import os.path as osp
+import platform
+
+if "Windows" in platform.platform():
+    os.environ["path"] = \
+        "F:\\opencv-4.1.2\\build\\install;F:\\opencv-4.1.2\\build\\install\\x64\\mingw\\bin;" \
+        "F:\\opencv-4.1.2\\build\\install\\x64\\mingw\\lib;C:\\Windows\\system32;C:\\Windows;" \
+        "C:\\Windows\\System32\\Wbem;C:\\Windows\\System32\\WindowsPowerShell\\v1.0;" \
+        "C:\\Windows\\System32\\OpenSSH;C:\\Program Files (x86)\\NVIDIA Corporation\\PhysX\\Common;" \
+        "$HAVA_HOME\\bin;C:\\Program Files\\Git\\cmd;C:\\mingw64\\bin;F:\\adb;C:\\Program Files\\CMake\\bin;" \
+        "D:\\Anaconda3;C:\\Users\\orient\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Program Files (x86)\\CMake\\bin"
+
 import sys
 import time
 
@@ -57,10 +68,11 @@ class ClashRoyal:
         self.rate_of_winning = []
         self.reward_mean = []
         if sys.platform == 'win32':
-            self.lib = ctypes.cdll.LoadLibrary("G:\\\\PyCharmProjects\\\\deep_clash_royal\\\\lib\\\\libc_opencv.dll")
+            lib_path = "F:\\\\PyCharmProjects\\\\deep_clash_royal\\\\lib\\\\libc_opencv.dll"
         else:
-            self.lib = ctypes.cdll.LoadLibrary("./lib/libc_opencv.so")
+            lib_path = "./lib/libc_opencv.so"
 
+        self.lib = ctypes.cdll.LoadLibrary(lib_path)
         self.lib.detect_frame.restype = Result
 
     def _init_game(self, gameId):
@@ -217,7 +229,7 @@ class ClashRoyal:
                 if self.retry > 0 and self.retry % 5 == 0:
                     self.retry = 0
                     # normal 548 544     548 944
-                    self.device.tap_button([548, 544])
+                    self.device.tap_button([548, 944])
 
             else:
                 if result.purple_loc[0] != 0:
