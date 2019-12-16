@@ -2,6 +2,7 @@ import ctypes
 import os
 import os.path as osp
 import platform
+from utils.logger_utils import logger
 
 if "Windows" in platform.platform():
     os.environ["path"] = \
@@ -76,7 +77,7 @@ class ClashRoyalEnv:
         self.lib.detect_frame.restype = Result
 
     def _init_game(self, gameId):
-        print("init:" + str(gameId))
+        logger.info("init:" + str(gameId))
         self.game_start = True
         self.game_finish = False
         self.frame_count = 0
@@ -140,7 +141,7 @@ class ClashRoyalEnv:
         if not self.game_start:
             return
         if self.log:
-            print("{:s} error   spent:{:f}".format(self.device_id, result.milli))
+            logger.debug("{:s} error   spent:{:f}".format(self.device_id, result.milli))
         if self.record:
             cv2.imwrite(osp.join(self.error_dir, "{:d}.jpg".format(self.frame_count)), img)
 
@@ -149,10 +150,11 @@ class ClashRoyalEnv:
         if not self.game_start:
             return
         if self.log:
-            print(str(self.device_id) + "  running:" + str(result.frame_index) + "  " + str(
-                self.running_frame_count) + "  elixir:" + str(result.remain_elixir) + "  spent:" + str(result.milli))
+            logger.info(str(self.device_id) + "  running:" + str(result.frame_index) + "  " +
+                  str(self.running_frame_count) + "  elixir:" + str(result.remain_elixir)
+                  + "  spent:" + str(result.milli))
 
-            print("{:s}:{:f}-{:s}:{:f}-{:s}:{:f}-{:s}:{:f}".format(CARD_DICT[result.card_type[0]],
+            logger.info("{:s}:{:f}-{:s}:{:f}-{:s}:{:f}-{:s}:{:f}".format(CARD_DICT[result.card_type[0]],
                                                                    result.prob[0],
                                                                    CARD_DICT[result.card_type[1]],
                                                                    result.prob[1],
@@ -160,7 +162,8 @@ class ClashRoyalEnv:
                                                                    result.prob[2],
                                                                    CARD_DICT[result.card_type[3]],
                                                                    result.prob[3], ))
-            print("hp:{:f}-{:f}-{:f}-{:f}-{:f}-{:f}".format(result.opp_hp[0],
+
+            logger.info("hp:{:f}-{:f}-{:f}-{:f}-{:f}-{:f}".format(result.opp_hp[0],
                                                             result.opp_hp[1],
                                                             result.opp_hp[2],
                                                             result.mine_hp[0],
@@ -204,15 +207,14 @@ class ClashRoyalEnv:
     def _action_on_finish(self, result, img):
         self._finish_game()
         if self.log:
-            print("game in finish:" + str(result.battle_result) + "  spent:" + str(result.milli))
+            logger.debug("game in finish:" + str(result.battle_result) + "  spent:" + str(result.milli))
         if not self.game_start:
             return
         self._record_reward(result, img)
 
     def _action_on_hall(self, result):
         if self.log:
-            print(
-                "game in hall:" + str(result.index) + " grey:" + str(result.is_grey) + "  spent:" + str(result.milli))
+            logger.info("game in hall:" + str(result.index) + " grey:" + str(result.is_grey) + "  spent:" + str(result.milli))
         if self.game_start and self.game_finish:
             self.game_start = False
             self.game_finish = False
@@ -306,16 +308,14 @@ class ClashRoyalEnv:
 
     def _update_reward(self, reward_value, index):
         if self.log and reward_value != 0:
-            print("update  step {}  reward {:f} ".format(index, reward_value) + (
-                "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-                if reward_value > 0 else "-------------------------------------------------------------------------"))
+            logger.info("update  step {}  reward {:f} ".format(index, reward_value) +
+                  ("++++++++++"if reward_value > 0 else "----------"))
         self.rewards[index] += reward_value
 
     def _append_reward(self, reward_value, index):
         if self.log and reward_value != 0:
-            print("append  step {}  reward {:f} ".format(index, reward_value) + (
-                "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-                if reward_value > 0 else "-------------------------------------------------------------------------"))
+            logger.info("append  step {}  reward {:f} ".format(index, reward_value) +
+                  ("++++++++++"if reward_value > 0 else "----------"))
         self.rewards.append(reward_value)
 
     def step(self, observation, action):
@@ -333,7 +333,7 @@ class ClashRoyalEnv:
                         self.device.swipe([card[0], card[1], loc_x, loc_y])
             self.actions.append(action)
         else:
-            print("do nothing or skip step.")
+            logger.info("do nothing or skip step.")
             self.actions.append([0, 0, 0])
 
     def _episode_statistics(self, result):

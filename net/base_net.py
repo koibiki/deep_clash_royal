@@ -3,7 +3,7 @@ from config import cfg
 import time
 import os.path as osp
 import os
-
+from utils.logger_utils import logger
 
 class BaseNet:
 
@@ -37,12 +37,12 @@ class BaseNet:
         if weight_path is None:
             ckpt = tf.train.get_checkpoint_state(cfg.PATH.MODEL_SAVE_DIR)
             weight_path = ckpt.model_checkpoint_path
-        print('Restoring from {}...'.format(weight_path), end=' ')
+        logger.info('Restoring from {}...'.format(weight_path), end=' ')
         saver.restore(sess, weight_path)
         stem = os.path.splitext(os.path.basename(weight_path))[-1]
         restore_iter = int(stem.split('-')[-1])
         sess.run(self.global_step.assign(restore_iter))
-        print('done')
+        logger.info('done')
         return restore_iter
 
     def build_train_dataset(self, sess, tf_record_path, parse_func):

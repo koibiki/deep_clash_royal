@@ -11,6 +11,7 @@ from brain.memory import Memory
 from game.parse_result import parse_running_state
 from net.mobilenet_v2 import build_mobilenetv2
 from utils.img_utils import add_salt_and_pepper, add_gaussian_noise
+from utils.logger_utils import logger
 
 
 class DDPG(BaseBrain):
@@ -267,39 +268,39 @@ class DDPG(BaseBrain):
             avaiable_card_index = [i for i in range(93) if avaiable_card[0][i] != 0]
 
             card_list = [item for item in card_value[0] if item > -9000000]
-            print("dqn play:" + str(card_index) + " " + str(card_prob[0][card_index]) + " " + str(card_list)
+            logger.debug("dqn play:" + str(card_index) + " " + str(card_prob[0][card_index]) + " " + str(card_list)
                   + " " + str(avaiable_card_index))
             if card_index != 0:
                 if np.random.uniform() < 0.5:
                     action = [card_index, (loc_x[0][0] + 1) / 2, (loc_y[0][0] + 1) / 2]
-                    print("dqn play has action:" + str(action) + "#######################################")
+                    logger.debug("dqn play has action:" + str(action) + "#######################################")
                 else:
                     action = [0, 0, 0]
             else:
                 action = [0, 0, 0]
-            print("dqn choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]))
+            logger.debug("dqn choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]))
         elif uniform < 0.7:
             action = [0, 0, 0]
-            print("random choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]))
+            logger.debug("random choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]))
         elif uniform < 0.85:
             card = random.choice(range(1, 93))
             x_loc = np.random.uniform()
             y_loc = np.random.uniform()
             action = [card, x_loc, y_loc]
-            print("random choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]))
+            logger.debug("random choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]))
         else:
             card = random.choice(observation[3])
             x_loc = np.random.uniform()
             y_loc = np.random.uniform()
             action = [card, x_loc, y_loc]
-            print("random choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]))
+            logger.debug("random choose action:" + str(action) + "  " + str(observation[3]) + " " + str(observation[4]))
         return action
 
     @staticmethod
     def _process_img(img_path, flip):
         img = cv2.imread(img_path)
         if img is None:
-            print(img_path)
+            logger.warn(img_path)
         h, w, c = img.shape
         if h != 256 or w != 192:
             w = 1080
@@ -415,9 +416,9 @@ class DDPG(BaseBrain):
             self.learn_step_counter += 1
 
             if self.learn_step_counter > 0 and self.learn_step_counter % 25 == 0:
-                print('\nSave weights {:d}\n'.format(self.learn_step_counter))
+                logger.info('\nSave weights {:d}\n'.format(self.learn_step_counter))
                 self.saver.save(self.sess, self.model_save_path, global_step=self.learn_step_counter)
-            print("Train spent {:d}  {:f} ".format(self.learn_step_counter, time.time() * 1000 - start_time))
+            logger.info("Train spent {:d}  {:f} ".format(self.learn_step_counter, time.time() * 1000 - start_time))
 
     def learn(self):
         with self.sess.as_default():
@@ -452,7 +453,6 @@ class DDPG(BaseBrain):
                                self.x_action: actions[:, 1],
                                self.y_action: actions[:, 2]})
 
-            print(y)
             q_card_target = q_card_eval.copy()
             q_x_target = q_x_eval.copy()
             q_y_target = q_y_eval.copy()
@@ -491,9 +491,9 @@ class DDPG(BaseBrain):
             self.learn_step_counter += 1
 
             if self.learn_step_counter > 0 and self.learn_step_counter % 25 == 0:
-                print('\nSave weights {:d}\n'.format(self.learn_step_counter))
+                logger.info('\nSave weights {:d}\n'.format(self.learn_step_counter))
                 self.saver.save(self.sess, self.model_save_path, global_step=self.learn_step_counter)
-            print("Train spent {:d}  {:f} ".format(self.learn_step_counter, time.time() * 1000 - start_time))
+            logger.info("Train spent {:d}  {:f} ".format(self.learn_step_counter, time.time() * 1000 - start_time))
 
     def record_battle_result(self):
         with self.sess.as_default():
@@ -509,9 +509,9 @@ class DDPG(BaseBrain):
         ckpt = tf.train.get_checkpoint_state("./checkpoints")
         if ckpt is not None:
             weight_path = ckpt.model_checkpoint_path
-            print('Restoring from {}...'.format(weight_path), end=' ')
+            logger.info('Restoring from {}...'.format(weight_path), end=' ')
             self.saver.restore(self.sess, weight_path)
-            print('done')
+            logger.info('done')
 
     def load_memory(self, root):
         self.memory.load_memory(root)

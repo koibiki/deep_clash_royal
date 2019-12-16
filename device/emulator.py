@@ -8,6 +8,7 @@ import win32gui
 from PyQt5.QtWidgets import QApplication
 
 from utils.cmd_utils import execute_cmd
+from utils.logger_utils import logger
 
 
 class Emulator(Device):
@@ -48,7 +49,7 @@ class Emulator(Device):
         app = QApplication(sys.argv)
         screens = QApplication.screens()
         if len(screens) == 0:
-            print("screen :0")
+            logger.info("screen :0")
             return [None, -1]
         window = screens[0].grabWindow(self.hwnd)
         if win32gui.IsWindow(self.hwnd) == 1:
