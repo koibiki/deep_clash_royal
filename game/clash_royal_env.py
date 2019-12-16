@@ -27,7 +27,7 @@ from utils.c_lib_utils import Result, STATE_DICT, convert2pymat
 """
 
 
-class ClashRoyal:
+class ClashRoyalEnv:
     MODE = {"battle": 0,
             "friend_battle_host": 1,
             "friend_battle_guest": 2}
@@ -367,4 +367,4 @@ class ClashRoyal:
 
 
 if __name__ == '__main__':
-    royal = ClashRoyal("./", "id")
+    royal = ClashRoyalEnv("./", "id")

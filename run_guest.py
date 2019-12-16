@@ -5,7 +5,7 @@ import cv2
 from brain.ddpg import DDPG
 from brain.policy import PolicyGradient
 from device.mobile import Mobile
-from game.clash_royal import ClashRoyal
+from game.clash_royal import ClashRoyalEnv
 
 if __name__ == '__main__':
 
@@ -19,7 +19,7 @@ if __name__ == '__main__':
     address = "http://127.0.0.1:55481/device/" + device_id + "/video.flv"
     mobile = Mobile(device_id, address)
 
-    guest = ClashRoyal(root, device=mobile, mode=ClashRoyal.MODE["friend_battle_guest"], name="guest")
+    guest = ClashRoyalEnv(root, device=mobile, mode=ClashRoyalEnv.MODE["friend_battle_guest"], name="guest")
 
     brain = PolicyGradient(guest.img_shape, guest.state_shape, DDPG.BrainType["runner"], "guest")
 

@@ -1,12 +1,12 @@
 from brain.policy import PolicyGradient
 from device.emulator import Emulator
 from device.mobile import Mobile
-from game.clash_royal import ClashRoyal
+from game.clash_royal import ClashRoyalEnv
 
 # root = "/home/chengli/data/gym_data/clash_royal"
 root = "F:\\gym_data\\clash_royal"
 
-host = ClashRoyal(root, None, name="trainer")
+host = ClashRoyalEnv(root, None, name="trainer")
 
 base_brain = PolicyGradient(host.img_shape, host.state_shape, PolicyGradient.BrainType["trainer"], "trainer")
 

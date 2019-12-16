@@ -5,7 +5,7 @@ import os
 from multiprocessing import Pool, freeze_support, Process
 import random
 
-from game.clash_royal import ClashRoyal
+from game.clash_royal import ClashRoyalEnv
 
 
 def execute_command(shell_cmd):
@@ -55,7 +55,7 @@ if __name__ == '__main__':
     time_time = time.time()
 
     root = "../vysor/"
-    clash_royal = ClashRoyal(root, "cd9faa7f")
+    clash_royal = ClashRoyalEnv(root, "cd9faa7f")
     gameId = int(time_time)
     clash_royal._init_game(gameId)
     i = 0

@@ -6,7 +6,7 @@ from brain.base_brain import BaseBrain
 from brain.policy import PolicyGradient
 from device.emulator import Emulator
 from device.mobile import Mobile
-from game.clash_royal import ClashRoyal
+from game.clash_royal import ClashRoyalEnv
 
 if __name__ == '__main__':
 
@@ -23,7 +23,7 @@ if __name__ == '__main__':
     # device = Mobile(device_id, host_address)
     device = Emulator(device_id, "夜神模拟器")
 
-    host = ClashRoyal(root, device, mode=ClashRoyal.MODE["friend_battle_host"], name="host")
+    host = ClashRoyalEnv(root, device, mode=ClashRoyalEnv.MODE["friend_battle_host"], name="host")
 
     brain = PolicyGradient(host.img_shape, host.state_shape, BaseBrain.BrainType["runner"], "host")
 

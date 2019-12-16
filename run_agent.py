@@ -1,6 +1,6 @@
 import cv2
 
-from game.clash_royal import ClashRoyal
+from game.clash_royal import ClashRoyalEnv
 from utils.c_lib_utils import convert2pymat
 
 if __name__ == '__main__':
@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     root = "../vysor/"
 
-    clash_royal = ClashRoyal(root, "cd9faa7f")
+    clash_royal = ClashRoyalEnv(root, "cd9faa7f")
 
     while True:
         i += 1
