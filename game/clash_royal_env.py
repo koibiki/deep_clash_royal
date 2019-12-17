@@ -2,6 +2,8 @@ import ctypes
 import os
 import os.path as osp
 import platform
+
+from game.game_record import Record
 from utils.logger_utils import logger
 
 if "Windows" in platform.platform():
@@ -76,6 +78,9 @@ class ClashRoyalEnv:
         self.lib = ctypes.cdll.LoadLibrary(lib_path)
         self.lib.detect_frame.restype = Result
 
+        self.record = Record(root)
+
+
     def _init_game(self, gameId):
         logger.info("init:" + str(gameId))
         self.game_start = True
@@ -85,9 +90,7 @@ class ClashRoyalEnv:
         self.running_frame_count = 0
         self.game_id = gameId
         self.lib.init_game(gameId)
-        self.error_dir = osp.join(self.root, "{:d}/error".format(gameId))
-        self.running_dir = osp.join(self.root, "{:d}/running".format(gameId))
-        self.finish_dir = osp.join(self.root, "{:d}/finish".format(gameId))
+
         self.rewards = []
         self.actions = []
         self.imgs = []
@@ -95,9 +98,7 @@ class ClashRoyalEnv:
         self.pre_mine_crown = 0
         self.pre_opp_crown = 0
         self.memory_record.append(gameId)
-        os.makedirs(self.error_dir)
-        os.makedirs(self.running_dir)
-        os.makedirs(self.finish_dir)
+
 
     def frame_step(self, img):
         self.frame_count += 1
@@ -143,7 +144,7 @@ class ClashRoyalEnv:
         if self.log:
             logger.debug("{:s} error   spent:{:f}".format(self.device_id, result.milli))
         if self.record:
-            cv2.imwrite(osp.join(self.error_dir, "{:d}.jpg".format(self.frame_count)), img)
+            self.record.record_error_img(self.frame_count, img)
 
     def _action_on_running(self, result, img):
         self.retry = 0
@@ -197,11 +198,8 @@ class ClashRoyalEnv:
         self.imgs.append(cv2.resize(img_state, (192, 256)))
 
         if self.record:
-            img_path = osp.join(self.running_dir, "{:d}.jpg".format(result.frame_index))
-            if self.scale:
-                cv2.imwrite(img_path, self.imgs[result.frame_index])
-            else:
-                cv2.imwrite(img_path, img)
+            self.record.record_running_img(self.frame_count, self.imgs[result.frame_index])
+
         return state
 
     def _action_on_finish(self, result, img):
@@ -261,6 +259,9 @@ class ClashRoyalEnv:
             if self.record:
 
                 cv2.imwrite(osp.join(self.finish_dir, "{:d}.jpg".format(result.frame_index)), img)
+
+                self.record.record_finish_img(result.frame_index, img)
+
                 with open(osp.join(self.root, str(self.game_id) + "/state.txt"), "w") as f:
                     for i in range(len(self.states[:self.running_frame_count - 10])):
                         state_str = ""
@@ -357,10 +358,6 @@ class ClashRoyalEnv:
         episode_record = [self.game_id, img_paths, self.states[:max_step], self.actions[:max_step],
                           self.rewards[:max_step]]
         return episode_record
-
-    def get_rate_of_winning(self):
-        return (np.sum(self.rate_of_winning) / (0.0001 + len(self.rate_of_winning)), \
-                np.sum(self.reward_mean) / (0.0001 + len(self.reward_mean)))
 
     def reset(self):
         self.game_start = False
