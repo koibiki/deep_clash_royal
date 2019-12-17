@@ -53,32 +53,33 @@ class AlphaNet(nn.Module):
 
 		self.hidden_size = 1024
 
+		# card indices
 		self.card_indices = torch.from_numpy(np.array([i for i in range(94)]))
 
+		# img feature
 		self.battle_field_feature = BattleFieldFeature()
 
-		self.card_embeded = nn.Embedding(94, 64)
-
-		self.dense1 = nn.Linear(1024, 1024)
-
-		self.actor_gru = nn.GRU(1024, self.hidden_size)
-		self.critic_gru = nn.GRU(1024, self.hidden_size)
-
+		# card index embed
+		self.card_embed = nn.Embedding(93, 64)
+		self.dense = nn.Linear(1024, 1024)
 		self.relu = nn.ReLU()
 
 		# actor
+		self.actor_gru = nn.GRU(1024, self.hidden_size)
+		self.use_card = nn.Sequential(nn.Linear(1024, 1), nn.Sigmoid())
 		self.intent = nn.Linear(1024, 64)
 		self.pos_x = nn.Linear(1024, 6)
 		self.pos_y = nn.Linear(1024, 8)
 
 		# critic
+		self.critic_gru = nn.GRU(1024, self.hidden_size)
 		self.q = nn.Linear(1024, 1)
 
 	def forward(self, img, state, actor_hidden, critic_hidden):
 		battle_field_feature = self.battle_field_feature(img)
 		cat = torch.cat([battle_field_feature, state], dim=1)
 
-		actor_feature = self.dense1(cat)
+		actor_feature = self.dense(cat)
 		actor_feature = self.relu(actor_feature)
 
 		actor_feature = torch.Tensor.unsqueeze(actor_feature, 0)
@@ -86,23 +87,26 @@ class AlphaNet(nn.Module):
 		# actor run
 		actor_output, actor_hidden = self.actor_gru(actor_feature, actor_hidden)
 
+		use_card = self.use_card(actor_output)
+
 		action_intent = self.intent(actor_output)
 
-		card_embed = self.card_embeded(self.card_indices)
-
+		card_embed = self.card_embed(self.card_indices)
 		intent = action_intent.float().mm(card_embed.t())
 
 		pos_x = self.pos_x(actor_output)
 		pos_y = self.pos_y(actor_output)
 
 		# critic run
-		critic_feature = torch.cat([battle_field_feature, state, intent, pos_x, pos_y], dim=1)
+		action_intent = intent * use_card
+		action_pos_x = pos_x * use_card
+		action_pos_y = pos_y * use_card
 
+		critic_feature = torch.cat([battle_field_feature, state, action_intent, action_pos_x, action_pos_y], dim=1)
 		critic_output, critic_hidden = self.critic_gru(critic_feature, critic_hidden)
-
 		critic_q = self.q(critic_output)
 
-		return intent, pos_x, pos_y, critic_q
+		return use_card, intent, pos_x, pos_y, critic_q
 
 	def initHidden(self, batch_size):
 		result = torch.zeros(1, batch_size, self.hidden_size)
