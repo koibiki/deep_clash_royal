@@ -26,8 +26,8 @@ class DDPG(object):
 		self.num_actor_update_iteration = 0
 		self.num_training = 0
 
-	def select_action(self, state):
-		state = torch.FloatTensor(state.reshape(1, -1)).to(device)
+	def select_action(self, img, state):
+		state = torch.FloatTensor(img, state).to(device)
 		return self.actor(state).cpu().data.numpy().flatten()
 
 	def update(self):
@@ -43,7 +43,7 @@ class DDPG(object):
 
 			# Compute the target Q value
 			target_Q = self.critic_target(next_state, self.actor_target(next_state))
-			target_Q = reward + ((1 - done) * args.gamma * target_Q).detach()
+			target_Q = reward + ((1 - done) * 0.99 * target_Q).detach()
 
 			# Get current Q estimate
 			current_Q = self.critic(state, action)
@@ -67,10 +67,10 @@ class DDPG(object):
 
 			# Update the frozen target models
 			for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
-				target_param.data.copy_(args.tau * param.data + (1 - args.tau) * target_param.data)
+				target_param.data.copy_(0.01 * param.data + (1 - 0.01) * target_param.data)
 
 			for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
-				target_param.data.copy_(args.tau * param.data + (1 - args.tau) * target_param.data)
+				target_param.data.copy_(0.01 * param.data + (1 - 0.01) * target_param.data)
 
 			self.num_actor_update_iteration += 1
 			self.num_critic_update_iteration += 1
