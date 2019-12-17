@@ -47,7 +47,7 @@ class BattleFieldFeature(nn.Module):
 		return x
 
 
-class AlphaNet(nn.Module):
+class Actor(nn.Module):
 	def __init__(self):
 		super().__init__()
 
@@ -97,16 +97,59 @@ class AlphaNet(nn.Module):
 		pos_x = self.pos_x(actor_output)
 		pos_y = self.pos_y(actor_output)
 
-		# critic run
+		choice_index = torch.argmax(action_intent).cpu().numpy()
+
+		choice_card = card_embed[choice_index]
+
+		return use_card, intent, pos_x, pos_y, choice_card
+
+	def initHidden(self, batch_size):
+		result = torch.zeros(1, batch_size, self.hidden_size)
+		if torch.cuda.is_available():
+			return result.cuda()
+		else:
+			return result
+
+
+class Critic(nn.Module):
+	def __init__(self):
+		super().__init__()
+
+		self.hidden_size = 1024
+
+		# card indices
+		self.card_indices = torch.from_numpy(np.array([i for i in range(94)]))
+
+		# img feature
+		self.battle_field_feature = BattleFieldFeature()
+
+		# card index embed
+		self.card_embed = nn.Embedding(93, 64)
+		self.dense = nn.Linear(1024, 1024)
+		self.relu = nn.ReLU()
+
+		# critic
+		self.critic_gru = nn.GRU(1024, self.hidden_size)
+		self.q = nn.Linear(1024, 1)
+
+	def forward(self, img, state, critic_hidden, use_card, intent, pos_x, pos_y):
+		battle_field_feature = self.battle_field_feature(img)
+
 		action_intent = intent * use_card
 		action_pos_x = pos_x * use_card
 		action_pos_y = pos_y * use_card
 
-		critic_feature = torch.cat([battle_field_feature, state, action_intent, action_pos_x, action_pos_y], dim=1)
+		cat = torch.cat([battle_field_feature, state, action_intent, action_pos_x, action_pos_y], dim=1)
+
+		feature = self.dense(cat)
+		feature = self.relu(feature)
+		critic_feature = torch.Tensor.unsqueeze(feature, 0)
+
+		# critic run
 		critic_output, critic_hidden = self.critic_gru(critic_feature, critic_hidden)
 		critic_q = self.q(critic_output)
 
-		return use_card, intent, pos_x, pos_y, critic_q
+		return critic_q
 
 	def initHidden(self, batch_size):
 		result = torch.zeros(1, batch_size, self.hidden_size)
