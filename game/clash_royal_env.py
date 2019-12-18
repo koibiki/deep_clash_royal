@@ -7,13 +7,13 @@ from game.game_record import Record
 from utils.logger_utils import logger
 
 if "Windows" in platform.platform():
-    os.environ["path"] = \
-        "F:\\opencv-4.1.2\\build\\install;F:\\opencv-4.1.2\\build\\install\\x64\\mingw\\bin;" \
-        "F:\\opencv-4.1.2\\build\\install\\x64\\mingw\\lib;C:\\Windows\\system32;C:\\Windows;" \
-        "C:\\Windows\\System32\\Wbem;C:\\Windows\\System32\\WindowsPowerShell\\v1.0;" \
-        "C:\\Windows\\System32\\OpenSSH;C:\\Program Files (x86)\\NVIDIA Corporation\\PhysX\\Common;" \
-        "$HAVA_HOME\\bin;C:\\Program Files\\Git\\cmd;C:\\mingw64\\bin;F:\\adb;C:\\Program Files\\CMake\\bin;" \
-        "D:\\Anaconda3;C:\\Users\\orient\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Program Files (x86)\\CMake\\bin"
+	os.environ["path"] = \
+		"F:\\opencv-4.1.2\\build\\install;F:\\opencv-4.1.2\\build\\install\\x64\\mingw\\bin;" \
+		"F:\\opencv-4.1.2\\build\\install\\x64\\mingw\\lib;C:\\Windows\\system32;C:\\Windows;" \
+		"C:\\Windows\\System32\\Wbem;C:\\Windows\\System32\\WindowsPowerShell\\v1.0;" \
+		"C:\\Windows\\System32\\OpenSSH;C:\\Program Files (x86)\\NVIDIA Corporation\\PhysX\\Common;" \
+		"$HAVA_HOME\\bin;C:\\Program Files\\Git\\cmd;C:\\mingw64\\bin;F:\\adb;C:\\Program Files\\CMake\\bin;" \
+		"D:\\Anaconda3;C:\\Users\\orient\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Program Files (x86)\\CMake\\bin"
 
 import sys
 import time
@@ -31,337 +31,336 @@ from utils.c_lib_utils import Result, STATE_DICT, convert2pymat
 
 
 class ClashRoyalEnv:
-    MODE = {"battle": 0,
-            "friend_battle_host": 1,
-            "friend_battle_guest": 2}
+	MODE = {"battle": 0,
+	        "friend_battle_host": 1,
+	        "friend_battle_guest": 2}
 
-    def __init__(self, root, device, mode=MODE["battle"], name="gamer0"):
-        super().__init__()
-        w = 1080
+	def __init__(self, root, device, mode=MODE["battle"], name="gamer0"):
+		super().__init__()
+		w = 1080
 
-        # 1080 - 54 * 4   每个格子48
+		# 1080 - 54 * 4   每个格子48
+		self.offset_w = 39
 
-        self.offset_w = 39
+		self.offset_h = 94
 
-        self.offset_h = 94
+		self.width = 1080 // 2 - self.offset_w * 2
+		self.height = 62 * 10
 
-        self.width = 1080 // 2 - self.offset_w * 2
-        self.height = 62 * 10
+		self.device_id = device.device_id if device is not None else ""
+		self.device = device
+		self.mode = mode
+		self.name = name
+		self.root = root
+		self.record = True
+		self.scale = True
+		self.real_time = True
+		self.game_start = False
+		self.game_finish = False
+		self.frame_count = 0
+		self.log = True
+		self.retry = 0
+		self.card_choices = [[340, 1720], [560, 1702], [738, 1698], [938, 1718]]
+		self.n_card_actions = 93
+		self.img_shape = (256, 192, 3 * 4)
+		# 92种card是否可用 92种card消耗圣水量 (我方血量 对方血量) 剩余圣水量 耗时 双倍圣水 即死
+		self.state_shape = 1 + 92 * 3 + 2 + 1 + 1 + 1 + 1
 
-        self.device_id = device.device_id if device is not None else ""
-        self.device = device
-        self.mode = mode
-        self.name = name
-        self.root = root
-        self.record = True
-        self.scale = True
-        self.real_time = True
-        self.game_start = False
-        self.game_finish = False
-        self.frame_count = 0
-        self.log = True
-        self.retry = 0
-        self.card_choices = [[340, 1720], [560, 1702], [738, 1698], [938, 1718]]
-        self.n_card_actions = 93
-        self.img_shape = (256, 192, 3 * 4)
-        # 92种card是否可用 92种card消耗圣水量 (我方血量 对方血量) 剩余圣水量 耗时 双倍圣水 即死
-        self.state_shape = 1 + 92 * 3 + 2 + 1 + 1 + 1 + 1
+		self.memory_record = []
+		self.rate_of_winning = []
+		self.reward_mean = []
+		if sys.platform == 'win32':
+			lib_path = "F:\\\\PyCharmProjects\\\\deep_clash_royal\\\\lib\\\\libc_opencv.dll"
+		else:
+			lib_path = "./lib/libc_opencv.so"
 
-        self.memory_record = []
-        self.rate_of_winning = []
-        self.reward_mean = []
-        if sys.platform == 'win32':
-            lib_path = "F:\\\\PyCharmProjects\\\\deep_clash_royal\\\\lib\\\\libc_opencv.dll"
-        else:
-            lib_path = "./lib/libc_opencv.so"
+		self.lib = ctypes.cdll.LoadLibrary(lib_path)
+		self.lib.detect_frame.restype = Result
 
-        self.lib = ctypes.cdll.LoadLibrary(lib_path)
-        self.lib.detect_frame.restype = Result
+		self.record = Record(root)
 
-        self.record = Record(root)
+	def _init_game(self, gameId):
+		logger.info("init:" + str(gameId))
+		self.game_start = True
+		self.game_finish = False
+		self.frame_count = 0
+		self.skip_step = 0
+		self.running_frame_count = 0
+		self.game_id = gameId
+		self.lib.init_game(gameId)
 
+		self.rewards = []
+		self.actions = []
+		self.imgs = []
+		# 我方3塔血量 敌方3塔血量 剩余圣水量 游戏时长 双倍圣水 即死
+		self.env_states = []
+		# 0 ~ 93 可用的card 92种card消耗圣水量
+		self.card_states = []
 
-    def _init_game(self, gameId):
-        logger.info("init:" + str(gameId))
-        self.game_start = True
-        self.game_finish = False
-        self.frame_count = 0
-        self.skip_step = 0
-        self.running_frame_count = 0
-        self.game_id = gameId
-        self.lib.init_game(gameId)
+		self.pre_mine_crown = 0
+		self.pre_opp_crown = 0
+		self.memory_record.append(gameId)
 
-        self.rewards = []
-        self.actions = []
-        self.imgs = []
-        self.states = []
-        self.pre_mine_crown = 0
-        self.pre_opp_crown = 0
-        self.memory_record.append(gameId)
+	def frame_step(self, img):
+		self.frame_count += 1
+		result = Result()
 
+		pymat = convert2pymat(img)
+		result = self.lib.detect_frame(pymat, result)
 
-    def frame_step(self, img):
-        self.frame_count += 1
-        result = Result()
+		self._process_result(result, img)
+		if self.game_start and result.frame_state == STATE_DICT["RUNNING_STATE"] and result.frame_index >= 0:
+			img_range = []
+			for ii in range(4):
+				index = 0 if result.frame_index - ii * 5 < 0 else result.frame_index - ii * 5
+				img_range.append(self.imgs[index] / 255.)
 
-        pymat = convert2pymat(img)
-        result = self.lib.detect_frame(pymat, result)
+			step_imgs = np.concatenate(img_range, axis=-1)
+			state = self.states[result.frame_index]
+			observation = [result.frame_index, step_imgs, state, np.array(result.card_type), np.array(result.available)]
+		else:
+			observation = None
 
-        self._process_result(result, img)
-        if self.game_start and result.frame_state == STATE_DICT["RUNNING_STATE"] and result.frame_index >= 0:
-            img_range = []
-            for ii in range(4):
-                index = 0 if result.frame_index - ii * 5 < 0 else result.frame_index - ii * 5
-                img_range.append(self.imgs[index] / 255.)
+		return observation
 
-            step_imgs = np.concatenate(img_range, axis=-1)
-            state = self.states[result.frame_index]
-            observation = [result.frame_index, step_imgs, state, np.array(result.card_type), np.array(result.available)]
-        else:
-            observation = None
+	def _process_result(self, result, img):
+		state = None
+		if result.frame_state == STATE_DICT["ERROR_STATE"]:
+			self._action_on_error(result, img)
 
-        return observation
+		elif result.frame_state == STATE_DICT["MENU_STATE"]:
+			self._action_on_hall(result)
 
-    def _process_result(self, result, img):
-        state = None
-        if result.frame_state == STATE_DICT["ERROR_STATE"]:
-            self._action_on_error(result, img)
+		elif result.frame_state == STATE_DICT["RUNNING_STATE"]:
+			state = self._action_on_running(result, img)
 
-        elif result.frame_state == STATE_DICT["MENU_STATE"]:
-            self._action_on_hall(result)
+		elif result.frame_state == STATE_DICT["FINISH_STATE"]:
+			self._action_on_finish(result, img)
 
-        elif result.frame_state == STATE_DICT["RUNNING_STATE"]:
-            state = self._action_on_running(result, img)
+		return state
 
-        elif result.frame_state == STATE_DICT["FINISH_STATE"]:
-            self._action_on_finish(result, img)
+	def _action_on_error(self, result, img):
+		if not self.game_start:
+			return
+		if self.log:
+			logger.debug("{:s} error   spent:{:f}".format(self.device_id, result.milli))
+		if self.record:
+			self.record.record_error_img(self.frame_count, img)
 
-        return state
+	def _action_on_running(self, result, img):
+		self.retry = 0
+		if not self.game_start:
+			return
+		if self.log:
+			logger.info(str(self.device_id) + "  running:" + str(result.frame_index) + "  " +
+			            str(self.running_frame_count) + "  elixir:" + str(result.remain_elixir)
+			            + "  spent:" + str(result.milli))
 
-    def _action_on_error(self, result, img):
-        if not self.game_start:
-            return
-        if self.log:
-            logger.debug("{:s} error   spent:{:f}".format(self.device_id, result.milli))
-        if self.record:
-            self.record.record_error_img(self.frame_count, img)
+			logger.info("{:s}:{:f}-{:s}:{:f}-{:s}:{:f}-{:s}:{:f}".format(CARD_DICT[result.card_type[0]],
+			                                                             result.prob[0],
+			                                                             CARD_DICT[result.card_type[1]],
+			                                                             result.prob[1],
+			                                                             CARD_DICT[result.card_type[2]],
+			                                                             result.prob[2],
+			                                                             CARD_DICT[result.card_type[3]],
+			                                                             result.prob[3], ))
 
-    def _action_on_running(self, result, img):
-        self.retry = 0
-        if not self.game_start:
-            return
-        if self.log:
-            logger.info(str(self.device_id) + "  running:" + str(result.frame_index) + "  " +
-                  str(self.running_frame_count) + "  elixir:" + str(result.remain_elixir)
-                  + "  spent:" + str(result.milli))
+			logger.info("hp:{:f}-{:f}-{:f}-{:f}-{:f}-{:f}".format(result.opp_hp[0],
+			                                                      result.opp_hp[1],
+			                                                      result.opp_hp[2],
+			                                                      result.mine_hp[0],
+			                                                      result.mine_hp[1],
+			                                                      result.mine_hp[2], ))
+		if result.frame_index < 0:
+			return
+		self.running_frame_count += 1
+		self.skip_step = self.skip_step - 1 if self.skip_step > 0 else 0
 
-            logger.info("{:s}:{:f}-{:s}:{:f}-{:s}:{:f}-{:s}:{:f}".format(CARD_DICT[result.card_type[0]],
-                                                                   result.prob[0],
-                                                                   CARD_DICT[result.card_type[1]],
-                                                                   result.prob[1],
-                                                                   CARD_DICT[result.card_type[2]],
-                                                                   result.prob[2],
-                                                                   CARD_DICT[result.card_type[3]],
-                                                                   result.prob[3], ))
+		reward = 0
+		reward += result.opp_hp[0] * 0.2
+		reward += result.opp_hp[1] * 0.1
+		reward += result.opp_hp[2] * 0.1
+		reward -= result.mine_hp[0] * 0.2
+		reward -= result.mine_hp[1] * 0.1
+		reward -= result.mine_hp[2] * 0.1
+		self._append_reward(reward, result.frame_index)
 
-            logger.info("hp:{:f}-{:f}-{:f}-{:f}-{:f}-{:f}".format(result.opp_hp[0],
-                                                            result.opp_hp[1],
-                                                            result.opp_hp[2],
-                                                            result.mine_hp[0],
-                                                            result.mine_hp[1],
-                                                            result.mine_hp[2], ))
-        if result.frame_index < 0:
-            return
-        self.running_frame_count += 1
-        self.skip_step = self.skip_step - 1 if self.skip_step > 0 else 0
+		if result.opp_crown > self.pre_opp_crown:
+			self._update_reward(-0.6, result.frame_index - 5)
+			self.pre_opp_crown = result.opp_crown
+		if result.mine_crown > self.pre_mine_crown:
+			self._update_reward(0.6, result.frame_index - 5)
+			self.pre_mine_crown = result.mine_crown
 
-        reward = 0
-        reward += result.opp_hp[0] * 0.2
-        reward += result.opp_hp[1] * 0.1
-        reward += result.opp_hp[2] * 0.1
-        reward -= result.mine_hp[0] * 0.2
-        reward -= result.mine_hp[1] * 0.1
-        reward -= result.mine_hp[2] * 0.1
-        self._append_reward(reward, result.frame_index)
+		state = parse_frame_state(result)
 
-        if result.opp_crown > self.pre_opp_crown:
-            self._update_reward(-0.6, result.frame_index - 5)
-            self.pre_opp_crown = result.opp_crown
-        if result.mine_crown > self.pre_mine_crown:
-            self._update_reward(0.6, result.frame_index - 5)
-            self.pre_mine_crown = result.mine_crown
+		self.states.append(state)
+		img_state = img[self.offset_h: self.offset_h + self.height, self.offset_w: - self.offset_w, :]
+		self.imgs.append(cv2.resize(img_state, (192, 256)))
 
-        state = parse_frame_state(result)
+		if self.record:
+			self.record.record_running_img(self.frame_count, self.imgs[result.frame_index])
 
-        self.states.append(state)
-        img_state = img[self.offset_h: self.offset_h + self.height, self.offset_w: - self.offset_w, :]
-        self.imgs.append(cv2.resize(img_state, (192, 256)))
+		return state
 
-        if self.record:
-            self.record.record_running_img(self.frame_count, self.imgs[result.frame_index])
+	def _action_on_finish(self, result, img):
+		self._finish_game()
+		if self.log:
+			logger.debug("game in finish:" + str(result.battle_result) + "  spent:" + str(result.milli))
+		if not self.game_start:
+			return
+		self._record_reward(result, img)
 
-        return state
+	def _action_on_hall(self, result):
+		if self.log:
+			logger.info(
+				"game in hall:" + str(result.index) + " grey:" + str(result.is_grey) + "  spent:" + str(result.milli))
+		if self.game_start and self.game_finish:
+			self.game_start = False
+			self.game_finish = False
+		if not self.game_start:
+			self._init_game(int(str(int(time.time() * 100))[-9:]))
 
-    def _action_on_finish(self, result, img):
-        self._finish_game()
-        if self.log:
-            logger.debug("game in finish:" + str(result.battle_result) + "  spent:" + str(result.milli))
-        if not self.game_start:
-            return
-        self._record_reward(result, img)
+		if self.mode == self.MODE["battle"] and result.index == 2:
+			if self.retry > 25 and self.retry % 10 == 0:
+				self.retry = 0
+				self.device.tap_button([344, 1246])
 
-    def _action_on_hall(self, result):
-        if self.log:
-            logger.info("game in hall:" + str(result.index) + " grey:" + str(result.is_grey) + "  spent:" + str(result.milli))
-        if self.game_start and self.game_finish:
-            self.game_start = False
-            self.game_finish = False
-        if not self.game_start:
-            self._init_game(int(str(int(time.time() * 100))[-9:]))
+		elif self.mode == self.MODE["friend_battle_host"] and result.index == 3:
+			if result.is_grey:
+				if self.retry > 0 and self.retry % 5 == 0:
+					self.retry = 0
+					# normal 548 544     548 944
+					self.device.tap_button([548, 944])
 
-        if self.mode == self.MODE["battle"] and result.index == 2:
-            if self.retry > 25 and self.retry % 10 == 0:
-                self.retry = 0
-                self.device.tap_button([344, 1246])
+			else:
+				if result.purple_loc[0] != 0:
+					if self.retry > 0 and self.retry % 5 == 0:
+						self.retry = 0
+						self.device.tap_button([result.purple_loc[0], result.purple_loc[1]])
 
-        elif self.mode == self.MODE["friend_battle_host"] and result.index == 3:
-            if result.is_grey:
-                if self.retry > 0 and self.retry % 5 == 0:
-                    self.retry = 0
-                    # normal 548 544     548 944
-                    self.device.tap_button([548, 944])
+		elif self.mode == self.MODE["friend_battle_guest"] and result.index == 3:
+			if not result.is_grey:
+				if result.yellow_loc[0] != 0:
+					if self.retry > 0 and self.retry % 5 == 0:
+						self.retry = 0
+						self.device.tap_button([result.yellow_loc[0], result.yellow_loc[1]])
 
-            else:
-                if result.purple_loc[0] != 0:
-                    if self.retry > 0 and self.retry % 5 == 0:
-                        self.retry = 0
-                        self.device.tap_button([result.purple_loc[0], result.purple_loc[1]])
+		self.retry += 1
 
-        elif self.mode == self.MODE["friend_battle_guest"] and result.index == 3:
-            if not result.is_grey:
-                if result.yellow_loc[0] != 0:
-                    if self.retry > 0 and self.retry % 5 == 0:
-                        self.retry = 0
-                        self.device.tap_button([result.yellow_loc[0], result.yellow_loc[1]])
+	def _record_reward(self, result, img):
+		if self.game_start and not self.game_finish:
+			self.game_finish = True
+			reward = 0
+			if result.battle_result == 1:
+				reward = 1 - result.time * 0.001
+			elif result.battle_result == -1:
+				reward = -1 + result.time * 0.001
+			self._update_reward(reward, result.frame_index - 11)
 
-        self.retry += 1
+			if self.record:
+				self.record.record_finish_img(result.frame_index, img)
 
-    def _record_reward(self, result, img):
-        if self.game_start and not self.game_finish:
-            self.game_finish = True
-            reward = 0
-            if result.battle_result == 1:
-                reward = 1 - result.time * 0.001
-            elif result.battle_result == -1:
-                reward = -1 + result.time * 0.001
-            self._update_reward(reward, result.frame_index - 11)
+				with open(osp.join(self.root, str(self.game_id) + "/state.txt"), "w") as f:
+					for i in range(len(self.states[:self.running_frame_count - 10])):
+						state_str = ""
+						for item in self.states[i]:
+							state_str += str(item) + ","
+						state_str = state_str[:-1]
+						f.write(str(i) + ":" + state_str)
+						f.write("\n")
+				with open(osp.join(self.root, str(self.game_id) + "/action.txt"), "w") as f:
+					for i in range(len(self.actions[:self.running_frame_count - 10])):
+						f.write(str(i) + ":" + str(self.actions[i]))
+						f.write("\n")
+				with open(osp.join(self.root, str(self.game_id) + "/reward.txt"), "w") as f:
+					for i in range(len(self.rewards[:self.running_frame_count - 10])):
+						f.write(str(i) + ":" + str(round(self.rewards[i], 1)))
+						f.write("\n")
 
-            if self.record:
+				old_path = osp.join(self.root, str(self.game_id))
+				result_path = "fail"
+				if result.battle_result == 1:
+					result_path = "win"
+				elif result.battle_result == 0:
+					result_path = "draw"
 
-                cv2.imwrite(osp.join(self.finish_dir, "{:d}.jpg".format(result.frame_index)), img)
+				new_path = osp.join(self.root, result_path + "/" + str(self.game_id))
+				os.rename(old_path, new_path)
 
-                self.record.record_finish_img(result.frame_index, img)
+			if len(self.rate_of_winning) > 20:
+				self.rate_of_winning.pop(0)
+			self.rate_of_winning.append(1 if result.battle_result == 1 else 0)
 
-                with open(osp.join(self.root, str(self.game_id) + "/state.txt"), "w") as f:
-                    for i in range(len(self.states[:self.running_frame_count - 10])):
-                        state_str = ""
-                        for item in self.states[i]:
-                            state_str += str(item) + ","
-                        state_str = state_str[:-1]
-                        f.write(str(i) + ":" + state_str)
-                        f.write("\n")
-                with open(osp.join(self.root, str(self.game_id) + "/action.txt"), "w") as f:
-                    for i in range(len(self.actions[:self.running_frame_count - 10])):
-                        f.write(str(i) + ":" + str(self.actions[i]))
-                        f.write("\n")
-                with open(osp.join(self.root, str(self.game_id) + "/reward.txt"), "w") as f:
-                    for i in range(len(self.rewards[:self.running_frame_count - 10])):
-                        f.write(str(i) + ":" + str(round(self.rewards[i], 1)))
-                        f.write("\n")
+			if len(self.reward_mean) > 50:
+				self.reward_mean.pop(0)
 
-                old_path = osp.join(self.root, str(self.game_id))
-                result_path = "fail"
-                if result.battle_result == 1:
-                    result_path = "win"
-                elif result.battle_result == 0:
-                    result_path = "draw"
+			self.reward_mean.append(np.sum(self.rewards[:self.running_frame_count - 10]))
 
-                new_path = osp.join(self.root, result_path + "/" + str(self.game_id))
-                os.rename(old_path, new_path)
+			self.episode_record = self._episode_statistics(result)
 
-            if len(self.rate_of_winning) > 20:
-                self.rate_of_winning.pop(0)
-            self.rate_of_winning.append(1 if result.battle_result == 1 else 0)
+	def _finish_game(self):
+		if self.retry % 50 == 0:
+			self.retry = 0
+			self.device.tap_button([536, 1684])
 
-            if len(self.reward_mean) > 50:
-                self.reward_mean.pop(0)
+		self.retry += 1
 
-            self.reward_mean.append(np.sum(self.rewards[:self.running_frame_count - 10]))
+	def _update_reward(self, reward_value, index):
+		if self.log and reward_value != 0:
+			logger.info("update  step {}  reward {:f} ".format(index, reward_value) +
+			            ("++++++++++" if reward_value > 0 else "----------"))
+		self.rewards[index] += reward_value
 
-            self.episode_record = self._episode_statistics(result)
+	def _append_reward(self, reward_value, index):
+		if self.log and reward_value != 0:
+			logger.info("append  step {}  reward {:f} ".format(index, reward_value) +
+			            ("++++++++++" if reward_value > 0 else "----------"))
+		self.rewards.append(reward_value)
 
-    def _finish_game(self):
-        if self.retry % 50 == 0:
-            self.retry = 0
-            self.device.tap_button([536, 1684])
+	def step(self, observation, action):
+		index = observation[0]
+		if self.skip_step == 0 and action[0] != 0:
+			# 更新 选择了不可用 card 的 reward
+			if action[0] in observation[3]:
+				card_index = np.argmax([action[0] == item for item in observation[3]])
+				if observation[4][card_index] != 0:
+					self.skip_step = 5
+					card = self.card_choices[card_index]
+					loc_x = int(action[1] * self.width * 2) + self.offset_w * 2
+					loc_y = int(action[2] * self.height * 2) + self.offset_h * 2
+					if self.real_time:
+						self.device.swipe([card[0], card[1], loc_x, loc_y])
+			self.actions.append(action)
+		else:
+			logger.info("do nothing or skip step.")
+			self.actions.append([0, 0, 0])
 
-        self.retry += 1
+	def _episode_statistics(self, result):
+		skip_step = 10
+		max_step = self.running_frame_count - skip_step
 
-    def _update_reward(self, reward_value, index):
-        if self.log and reward_value != 0:
-            logger.info("update  step {}  reward {:f} ".format(index, reward_value) +
-                  ("++++++++++"if reward_value > 0 else "----------"))
-        self.rewards[index] += reward_value
+		img_paths = []
+		type_dir = "fail"
+		if result.battle_result == 1:
+			type_dir = "win"
+		elif result.battle_result == 0:
+			type_dir = "draw"
 
-    def _append_reward(self, reward_value, index):
-        if self.log and reward_value != 0:
-            logger.info("append  step {}  reward {:f} ".format(index, reward_value) +
-                  ("++++++++++"if reward_value > 0 else "----------"))
-        self.rewards.append(reward_value)
+		save_dir = osp.join(self.root, type_dir + "/" + str(self.game_id)) + "/running"
+		for index in range(max_step):
+			indices = [index + 5, index, index - 5, index - 5 * 2, index - 5 * 3]
+			indices = [max(0, item) for item in indices]
+			indices = [min(item, max_step - 1) for item in indices]
+			img_path = [osp.join(save_dir, str(i) + ".jpg") for i in indices]
+			img_paths.append(img_path)
+		episode_record = [self.game_id, img_paths, self.states[:max_step], self.actions[:max_step],
+		                  self.rewards[:max_step]]
+		return episode_record
 
-    def step(self, observation, action):
-        index = observation[0]
-        if self.skip_step == 0 and action[0] != 0:
-            # 更新 选择了不可用 card 的 reward
-            if action[0] in observation[3]:
-                card_index = np.argmax([action[0] == item for item in observation[3]])
-                if observation[4][card_index] != 0:
-                    self.skip_step = 5
-                    card = self.card_choices[card_index]
-                    loc_x = int(action[1] * self.width * 2) + self.offset_w * 2
-                    loc_y = int(action[2] * self.height * 2) + self.offset_h * 2
-                    if self.real_time:
-                        self.device.swipe([card[0], card[1], loc_x, loc_y])
-            self.actions.append(action)
-        else:
-            logger.info("do nothing or skip step.")
-            self.actions.append([0, 0, 0])
-
-    def _episode_statistics(self, result):
-        skip_step = 10
-        max_step = self.running_frame_count - skip_step
-
-        img_paths = []
-        type_dir = "fail"
-        if result.battle_result == 1:
-            type_dir = "win"
-        elif result.battle_result == 0:
-            type_dir = "draw"
-
-        save_dir = osp.join(self.root, type_dir + "/" + str(self.game_id)) + "/running"
-        for index in range(max_step):
-            indices = [index + 5, index, index - 5, index - 5 * 2, index - 5 * 3]
-            indices = [max(0, item) for item in indices]
-            indices = [min(item, max_step - 1) for item in indices]
-            img_path = [osp.join(save_dir, str(i) + ".jpg") for i in indices]
-            img_paths.append(img_path)
-        episode_record = [self.game_id, img_paths, self.states[:max_step], self.actions[:max_step],
-                          self.rewards[:max_step]]
-        return episode_record
-
-    def reset(self):
-        self.game_start = False
+	def reset(self):
+		self.game_start = False
 
 
 if __name__ == '__main__':
-    royal = ClashRoyalEnv("./", "id")
+	royal = ClashRoyalEnv("./", "id")

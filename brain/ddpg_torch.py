@@ -7,7 +7,8 @@ from tensorboardX import SummaryWriter
 
 
 class DDPG(object):
-	def __init__(self, ):
+	def __init__(self, directory):
+		self.directory = directory
 
 		device = torch.device("")
 
@@ -21,13 +22,14 @@ class DDPG(object):
 		self.critic_target.load_state_dict(self.critic.state_dict())
 		self.critic_optimizer = optim.Adam(self.critic.parameters(), 0.001)
 		self.replay_buffer = Replay_buffer()
-		self.writer = SummaryWriter(directory)
+		self.writer = SummaryWriter(self.directory)
 		self.num_critic_update_iteration = 0
 		self.num_actor_update_iteration = 0
 		self.num_training = 0
 
 	def select_action(self, img, state):
-		state = torch.FloatTensor(img, state).to(device)
+		img = torch.FloatTensor(img).to(device)
+		state = torch.FloatTensor(state).to(device)
 		return self.actor(state).cpu().data.numpy().flatten()
 
 	def update(self):
@@ -76,15 +78,15 @@ class DDPG(object):
 			self.num_critic_update_iteration += 1
 
 	def save(self):
-		torch.save(self.actor.state_dict(), directory + 'actor.pth')
-		torch.save(self.critic.state_dict(), directory + 'critic.pth')
+		torch.save(self.actor.state_dict(), self.directory + 'actor.pth')
+		torch.save(self.critic.state_dict(), self.directory + 'critic.pth')
 		print("====================================")
 		print("Model has been saved...")
 		print("====================================")
 
 	def load(self):
-		self.actor.load_state_dict(torch.load(directory + 'actor.pth'))
-		self.critic.load_state_dict(torch.load(directory + 'critic.pth'))
+		self.actor.load_state_dict(torch.load(self.directory + 'actor.pth'))
+		self.critic.load_state_dict(torch.load(self.directory + 'critic.pth'))
 		print("====================================")
 		print("model has been loaded...")
 		print("====================================")

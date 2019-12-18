@@ -250,10 +250,6 @@ class DDPG(BaseBrain):
             self.memory.reward_dict[str(game_id) + "_" + str(index)] = rewards[index]
         self.memory.update_dict()
 
-    def update_episode_result(self, result):
-        self.rate_of_winning = result[0]
-        self.reward_sum = result[1]
-
     def choose_action(self, observation):
         uniform = np.random.uniform()
         if uniform <= 0.:
@@ -382,10 +378,6 @@ class DDPG(BaseBrain):
             start_time = time.time() * 1000
             self.sess.run(self.soft_replace)
 
-            if self.brain_type != self.BrainType["trainer"]:
-                self.sess.run(tf.assign(self._rate_of_winning, self.rate_of_winning))
-                self.sess.run(tf.assign(self._reward, self.reward_sum))
-
             while True:
                 tree_idx, batch_memory, weights = self.memory.sample(self.batch_size)
                 imgs, states, has_action, actions, reward, next_imgs, next_states \
@@ -494,16 +486,6 @@ class DDPG(BaseBrain):
                 logger.info('\nSave weights {:d}\n'.format(self.learn_step_counter))
                 self.saver.save(self.sess, self.model_save_path, global_step=self.learn_step_counter)
             logger.info("Train spent {:d}  {:f} ".format(self.learn_step_counter, time.time() * 1000 - start_time))
-
-    def record_battle_result(self):
-        with self.sess.as_default():
-            self.sess.run(tf.assign(self._rate_of_winning, self.rate_of_winning))
-            self.sess.run(tf.assign(self._reward, self.reward_sum))
-            summary = self.sess.run([self.merge_summary], )
-
-            self.writer.add_summary(summary=summary[0], global_step=self.learn_step_counter)
-
-            self.learn_step_counter += 1
 
     def load_model(self):
         ckpt = tf.train.get_checkpoint_state("./checkpoints")

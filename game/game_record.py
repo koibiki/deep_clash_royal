@@ -52,3 +52,7 @@ class Record(object):
 
 	def record_finish_img(self, index, img):
 		cv2.imwrite(osp.join(self.finish_dir, "{:d}.jpg".format(index)), img)
+
+
+	def record_env_state(self, env_state):
+
