@@ -48,12 +48,12 @@ class BattleFieldFeature(nn.Module):
 		return x
 
 
-class Actor(nn.Module):
+class PpoNet(nn.Module):
 	def __init__(self):
 		super().__init__()
 
 		self.hidden_size = 1024
-		self.embed_size = 128
+		self.embed_size = 64
 
 		# card indices
 		self.card_indices = torch.from_numpy(np.array([i for i in range(94)]))
@@ -62,7 +62,9 @@ class Actor(nn.Module):
 		self.battle_field_feature = BattleFieldFeature()
 
 		# card index embed
-		self.card_embed = nn.Embedding(93, self.embed_size)
+		self.card_embed = nn.Embedding(94, self.embed_size)
+		self.card_dense = nn.Linear(self.embed_size + 2, 64)
+
 		self.dense = nn.Linear(1024, 1024)
 
 		# actor
@@ -72,68 +74,58 @@ class Actor(nn.Module):
 		self.pos_x = nn.Linear(1024, 6)
 		self.pos_y = nn.Linear(1024, 8)
 
-	def forward(self, img, env_state, card_state, actor_hidden):
-		battle_field_feature = self.battle_field_feature(img)
-		cat = torch.cat([battle_field_feature, env_state, card_state], dim=1)
-
-		actor_feature = F.relu(self.dense(cat))
-		actor_feature = torch.Tensor.unsqueeze(actor_feature, 0)
-
-		# actor run
-		actor_output, actor_hidden = self.actor_gru(actor_feature, actor_hidden)
-
-		use_card = F.softmax(self.use_card(actor_output), dim=1)
-
-		action_intent = self.intent(actor_output)
-
-		card_embed = self.card_embed(self.card_indices)
-		card = action_intent.float().mm(card_embed.t())
-
-		pos_x = F.softmax(self.pos_x(actor_output))
-		pos_y = F.softmax(self.pos_y(actor_output))
-
-		choice_index = torch.argmax(card).cpu().numpy()
-
-		choice_card = card_embed[choice_index]
-
-		return use_card, card, pos_x, pos_y, choice_card, actor_hidden
-
-	def initHidden(self, batch_size):
-		result = torch.zeros(1, batch_size, self.hidden_size)
-		if torch.cuda.is_available():
-			return result.cuda()
-		else:
-			return result
-
-
-class CriticPPO(nn.Module):
-
-	def __init__(self):
-		super().__init__()
-
-		self.hidden_size = 1024
-
-		# img feature
-		self.battle_field_feature = BattleFieldFeature()
-		self.dense = nn.Linear(1024, 1024)
-
-		# critic
-		self.critic_gru = nn.GRU(1024, self.hidden_size)
-		self.q = nn.Linear(1024, 1)
-
-	def forward(self, img, env_state, card_state, critic_hidden):
+	def forward(self, img, env_state, card_state, actor_hidden=None, critic_hidden=None):
 		battle_field_feature = self.battle_field_feature(img)
 
-		cat = torch.cat([battle_field_feature, env_state, card_state], dim=1)
+		card0 = card_state[:, :96]
+		card1 = card_state[:, 96:96 * 2]
+		card2 = card_state[:, 96 * 2:96 * 3]
+		card3 = card_state[:, 96 * 3:]
+
+		card_embed0 = self.card_embed(card0[:, :94])
+		card_state0 = F.relu(self.card_dense(torch.cat([card_embed0, card0[:, 94:]], dim=1)))
+
+		card_embed1 = self.card_embed(card1[:, :94])
+		card_state1 = F.relu(self.card_dense(torch.cat([card_embed1, card1[:, 94:]], dim=1)))
+
+		card_embed2 = self.card_embed(card2[:, :94])
+		card_state2 = F.relu(self.card_dense(torch.cat([card_embed2, card2[:, 94:]], dim=1)))
+
+		card_embed3 = self.card_embed(card3[:, :94])
+		card_state3 = F.relu(self.card_dense(torch.cat([card_embed3, card3[:, 94:]], dim=1)))
+
+		cat = torch.cat([battle_field_feature, env_state, card_state0, card_state1, card_state2, card_state3], dim=1)
 
 		feature = F.relu(self.dense(cat))
-		critic_feature = torch.Tensor.unsqueeze(feature, 0)
+		feature = torch.Tensor.unsqueeze(feature, 0)
+
+		result = {}
+		# actor run
+		if actor_hidden is not None:
+			actor_output, actor_hidden = self.actor_gru(feature, actor_hidden)
+
+			use_card = F.softmax(self.use_card(actor_output), dim=1)
+
+			action_intent = self.intent(actor_output)
+
+			card_embed = self.card_embed(self.card_indices)
+			card = action_intent.float().mm(card_embed.t())
+
+			pos_x = F.softmax(self.pos_x(actor_output))
+			pos_y = F.softmax(self.pos_y(actor_output))
+
+			choice_index = torch.argmax(card).cpu().numpy()
+
+			choice_card = card_embed[choice_index]
+
+			result["actor"] = [use_card, card, pos_x, pos_y, choice_card, actor_hidden]
 
 		# critic run
-		critic_output, critic_hidden = self.critic_gru(critic_feature, critic_hidden)
-		critic_q = self.q(critic_output)
-
-		return critic_q, critic_hidden
+		if critic_hidden is not None:
+			critic_output, critic_hidden = self.critic_gru(feature, critic_hidden)
+			critic_v = self.value(critic_output)
+			result["critic"] = [critic_v, critic_hidden]
+		return result
 
 	def initHidden(self, batch_size):
 		result = torch.zeros(1, batch_size, self.hidden_size)

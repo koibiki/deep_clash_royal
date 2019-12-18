@@ -39,20 +39,23 @@ class Record(object):
 			logger.error("错误的游戏结果.")
 
 	def record_error_img(self, index, img):
-		cv2.imwrite(osp.join(self.error_dir, "{:d}.jpg".format(index)), img)
+		pass
+		# cv2.imwrite(osp.join(self.error_dir, "{:d}.jpg".format(index)), img)
 
 	def record_running_img(self, index, img):
-		img_path = osp.join(self.running_dir, "{:d}.jpg".format(index))
-		if self.scale:
-			cv2.imwrite(img_path, img)
-		else:
-			cv2.imwrite(img_path, img)
-
-		cv2.imwrite(osp.join(self.running_dir, "{:d}.jpg".format(index)), img)
+		return
+		# img_path = osp.join(self.running_dir, "{:d}.jpg".format(index))
+		# if self.scale:
+		# 	cv2.imwrite(img_path, img)
+		# else:
+		# 	cv2.imwrite(img_path, img)
+		#
+		# cv2.imwrite(osp.join(self.running_dir, "{:d}.jpg".format(index)), img)
 
 	def record_finish_img(self, index, img):
-		cv2.imwrite(osp.join(self.finish_dir, "{:d}.jpg".format(index)), img)
+		pass
+		# cv2.imwrite(osp.join(self.finish_dir, "{:d}.jpg".format(index)), img)
 
 
 	def record_env_state(self, env_state):
-
+		pass

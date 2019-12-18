@@ -20,8 +20,7 @@ card_dict = {0: "empty", 1: "Lightning", 2: "Furnace", 3: "GoblinBarrel", 4: "Da
              75: "ElectroDragon", 76: "InfernoTower", 77: "Balloon", 78: "BomberTower", 79: "Minions",
              80: "MagicArcher", 81: "MinionHorde", 82: "LavaHound", 83: "Rocket", 84: "ElectorWizard",
              85: "remain0", 86: "remain1", 87: "remain2", 88: "remain3", 89: "remain4",
-             90: "remain5", 91: "remain6", 92: "remain7"
-             }
+             90: "remain5", 91: "remain6", 92: "remain7"}
 
 elixir_dict = {"empty": 0.0, "Lightning": 0.6, "Furnace": 0.4, "GoblinBarrel": 0.2, "DarkPrince": 0.4,
                "Prince": 0.5, "RoyalHogs": 0.5, "Freeze": 0.4, "Giant": 0.5, "Bowler": 0.5,
@@ -41,25 +40,50 @@ elixir_dict = {"empty": 0.0, "Lightning": 0.6, "Furnace": 0.4, "GoblinBarrel": 0
                "ElectroDragon": 0.5, "InfernoTower": 0.5, "Balloon": 0.5, "BomberTower": 0.4, "Minions": 0.3,
                "MagicArcher": 0.0, "MinionHorde": 0.5, "LavaHound": 0.0, "Rocket": 0.6, "ElectorWizard": 0.0,
                "remain0": 0.0, "remain1": 0.0, "remain2": 0.0, "remain3": 0.0, "remain4": 0.0,
-               "remain5": 0.0, "remain6": 0.0, "remain7": 0.0
-               }
+               "remain5": 0.0, "remain6": 0.0, "remain7": 0.0}
 
 
 def parse_frame_state(result):
+    remain_elixir = result.remain_elixir / 10
+    double_elixir = 1 if result.time > 60 * 2 - 1 else 0
+    dead_im = 1 if result.time > 60 * 3 - 1 else 0
+
+    env_state = [result.opp_hp[0], result.opp_hp[1], result.opp_hp[2], result.mine_hp[0], result.mine_hp[1],
+                 result.mine_hp[2], result.remain_elixir / 10, remain_elixir, double_elixir, dead_im]
+
     card_type = np.array(result.card_type)
     card_available = np.array(result.available)
-    remain_elixir = np.ones(1, dtype=np.float32)
-    spent_time = np.ones(1, dtype=np.float32)
-    double_elixir = np.ones(1, dtype=np.float32)
-    dead_im = np.ones(1, dtype=np.float32)
-    hp = np.ones(2, dtype=np.float32)  # 双方血量
+    empty = [0 for _ in range(96)]
+    card0 = empty.copy()
+    card0[card_type[0]] = 1
+    card0[94] = card_available[0]
+    card0[95] = elixir_dict[card_dict[card_type[0]]]
+    card1 = empty.copy()
+    card1[card_type[0]] = 1
+    card1[94] = card_available[1]
+    card1[95] = elixir_dict[card_dict[card_type[1]]]
+    card2 = empty.copy()
+    card2[card_type[0]] = 1
+    card2[94] = card_available[2]
+    card2[95] = elixir_dict[card_dict[card_type[2]]]
+    card3 = empty.copy()
+    card3[card_type[0]] = 1
+    card3[94] = card_available[3]
+    card3[95] = elixir_dict[card_dict[card_type[3]]]
 
-    remain_elixir[0] = result.remain_elixir / 10
-    spent_time[0] = result.time / 60
-    double_elixir[0] = 1 if result.time > 60 * 2 - 1 else 0
-    dead_im[0] = 1 if result.time > 60 * 3 - 1 else 0
-    state = np.concatenate([card_type, card_available, hp, remain_elixir, spent_time, double_elixir, dead_im], axis=0)
-    return state
+    card_state = card0 + card1 + card2 + card3
+
+    return env_state, card_state
+
+
+def calu_available_card(card_state):
+    card0 = card_state[:96]
+    card1 = card_state[96:96 * 2]
+    card2 = card_state[96 * 2:96 * 3]
+    card3 = card_state[96 * 3:]
+    available_card = np.array(card0[:94]) * card0[94] + np.array(card1[:94]) * card1[94] + \
+                     np.array(card2[:94]) * card2[94] + np.array(card3[:94]) * card3[94]
+    return available_card
 
 
 def parse_running_state(state):

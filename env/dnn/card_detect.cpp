@@ -5,6 +5,7 @@
 #include "card_detect.h"
 
 CardDetect::CardDetect() {
+    cout << "init CardDetect." << endl;
     string mode_path = "./asset/card_net.pb";
     this->load_model(mode_path);
 }

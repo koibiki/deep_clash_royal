@@ -120,7 +120,9 @@ int RunningDetect::get_most_possible_num(Mat &src, bool is_opp) {
             possible_num = i / 2;
         }
     }
-    cout << "value:" << possible_num << "     similar value:" << max_similar_value << endl;
+    if (debug){
+        cout << "value:" << possible_num << "     similar value:" << max_similar_value << endl;
+    }
     if (max_similar_value >= 0.70) {
         return possible_num;
     } else {

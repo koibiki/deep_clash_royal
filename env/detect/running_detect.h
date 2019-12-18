@@ -30,6 +30,7 @@ private:
 
     int pre_opp_crown = 0;
     int pre_mine_crown = 0;
+    bool debug = false;
 
     Mat process_img(Mat &src, int color_index);
 
