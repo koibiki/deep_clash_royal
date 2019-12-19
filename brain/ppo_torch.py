@@ -23,7 +23,7 @@ class PPO(object):
 
     def __init__(self, ):
         super(PPO, self).__init__()
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda:0" if not torch.cuda.is_available() else "cpu")
 
         self.ppo_net = PpoNet().to(self.device)
         self.counter = 0
@@ -39,7 +39,7 @@ class PPO(object):
         return self.run_actor_action(np.array([observation[1]]), [observation[2]], [observation[3]],
                                      [observation[4]], observation[5])
 
-    def run_actor_action(self, img, env_state, card_type, card_property,actor_hidden=None):
+    def run_actor_action(self, img, env_state, card_type, card_property, actor_hidden=None):
         if actor_hidden is None:
             actor_hidden = self.ppo_net.initHidden(len(img))
         img = torch.from_numpy(img / 255.).float().to(self.device)
@@ -58,8 +58,7 @@ class PPO(object):
         pos_y = Categorical(pos_y_prob)
         action_pos_y = pos_y.sample()
 
-        return {"use_card": (action_use_card.item(), use_card_prob[:, action_use_card.item()].item()),
-                "card": (action_card.item(), card_prob[:, action_card.item()].item()),
+        return {"card": (action_card.item(), card_prob[:, action_card.item()].item()),
                 "pos_x": (action_pos_x.item(), pos_x_prob[:, action_pos_x.item()].item()),
                 "pos_y": (action_pos_y.item(), pos_y_prob[:, action_pos_y.item()].item()),
                 "choice_card": choice_card}, actor_hidden

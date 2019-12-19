@@ -79,30 +79,30 @@ def parse_card_type_and_property(card_state):
     return card_type, card_property
 
 
-def calu_available_card(card_state):
-    card_state = np.array(card_state)
+def calu_available_card(card_type, card_property):
+    card_state = np.array(card_type)
     if len(card_state.shape) == 1:
-
-        card0 = card_state[:96]
-        card1 = card_state[96:96 * 2]
-        card2 = card_state[96 * 2:96 * 3]
-        card3 = card_state[96 * 3:]
-        available_card = np.array(card0[:94]) * card0[94] + np.array(card1[:94]) * card1[94] + \
-                         np.array(card2[:94]) * card2[94] + np.array(card3[:94]) * card3[94]
-        # available_card[0] = 1
+        available_card = [0 for _ in range(94)]
+        available_card[card_type[0]] = 0 if card_property[0] < 0.1 else 1
+        available_card[card_type[1]] = 0 if card_property[2] < 0.1 else 1
+        available_card[card_type[2]] = 0 if card_property[4] < 0.1 else 1
+        available_card[card_type[3]] = 0 if card_property[6] < 0.1 else 1
+        available_card[0] = 1
+        return available_card
     elif len(card_state.shape) == 2:
-        card0 = card_state[:, :96]
-        card1 = card_state[:, 96:96 * 2]
-        card2 = card_state[:, 96 * 2:96 * 3]
-        card3 = card_state[:, 96 * 3:]
-        available_card = np.array(card0[:, 94]) * np.array(card0[:, 94]).reshape(-1, 1) \
-                         + np.array(card1[:, 94]) * np.array(card1[:, 94]).reshape(-1, 1) \
-                         + np.array(card2[:, :94]) * np.array(card2[:, 94]).reshape(-1, 1) \
-                         + np.array(card3[:, :94]) * np.array(card3[:, 94]).reshape(-1, 1)
-        # available_card[:, 0] = 1
+        available_cards = []
+        for i, c in enumerate(card_type):
+            available_card = [0 for _ in range(94)]
+            available_card[c[0]] = 0 if card_property[i][0] < 0.1 else 1
+            available_card[c[1]] = 0 if card_property[i][2] < 0.1 else 1
+            available_card[c[2]] = 0 if card_property[i][4] < 0.1 else 1
+            available_card[c[3]] = 0 if card_property[i][6] < 0.1 else 1
+            available_card[0] = 1
+            available_cards.append(available_card)
+        available_cards = np.concatenate(available_cards, axis=-1)
+        return available_cards
     else:
         raise Exception("error card_state shape:{}".format(card_state.shape))
-    return available_card
 
 
 def parse_running_state(state):

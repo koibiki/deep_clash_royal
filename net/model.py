@@ -58,7 +58,7 @@ class PpoNet(nn.Module):
         self.embed_size = 64
 
         # card indices
-        self.card_indices = torch.from_numpy(np.array([i for i in range(94)]))
+        self.card_indices = torch.from_numpy(np.array([i for i in range(94)])).long()
 
         # img feature
         self.battle_field_feature = BattleFieldFeature()
@@ -69,7 +69,7 @@ class PpoNet(nn.Module):
                                         nn.ReLU(),
                                         nn.Linear(256, 64))
 
-        self.dense = nn.Linear(1024, 1024)
+        self.dense = nn.Linear(2132, 1024)
 
         # actor
         self.actor_gru = nn.GRU(1024, self.hidden_size)
@@ -107,14 +107,14 @@ class PpoNet(nn.Module):
         if actor_hidden is not None:
             actor_output, actor_hidden = self.actor_gru(feature, actor_hidden)
 
-            use_card = F.softmax(self.use_card(actor_output), dim=1)
+            actor_output = torch.squeeze(actor_output, 1)
 
             action_intent = self.intent(actor_output)
 
             card_embed = self.card_embed(self.card_indices)
             card = F.softmax(action_intent.float().mm(card_embed.t()), dim=1)
 
-            available_card = torch.from_numpy(calu_available_card(card_state.numpy())).cuda()
+            available_card = torch.from_numpy(calu_available_card(card_type.numpy(), card_property.numpy()))
             card = torch.mul(card, available_card)
 
             pos_x = F.softmax(self.pos_x(actor_output))
@@ -124,7 +124,7 @@ class PpoNet(nn.Module):
 
             choice_card = card_embed[choice_index]
 
-            result["actor"] = [use_card, card, pos_x, pos_y, choice_card, actor_hidden]
+            result["actor"] = [card, pos_x, pos_y, choice_card, actor_hidden]
 
         # critic run
         if critic_hidden is not None:
@@ -135,7 +135,7 @@ class PpoNet(nn.Module):
 
     def initHidden(self, batch_size):
         result = torch.zeros(1, batch_size, self.hidden_size)
-        if torch.cuda.is_available():
+        if not torch.cuda.is_available():
             return result.cuda()
         else:
             return result
