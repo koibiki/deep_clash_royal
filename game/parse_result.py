@@ -20,7 +20,7 @@ card_dict = {0: "empty", 1: "Lightning", 2: "Furnace", 3: "GoblinBarrel", 4: "Da
              75: "ElectroDragon", 76: "InfernoTower", 77: "Balloon", 78: "BomberTower", 79: "Minions",
              80: "MagicArcher", 81: "MinionHorde", 82: "LavaHound", 83: "Rocket", 84: "ElectorWizard",
              85: "remain0", 86: "remain1", 87: "remain2", 88: "remain3", 89: "remain4",
-             90: "remain5", 91: "remain6", 92: "remain7"}
+             90: "remain5", 91: "remain6", 92: "remain7", 93: "remain8"}
 
 elixir_dict = {"empty": 0.0, "Lightning": 0.6, "Furnace": 0.4, "GoblinBarrel": 0.2, "DarkPrince": 0.4,
                "Prince": 0.5, "RoyalHogs": 0.5, "Freeze": 0.4, "Giant": 0.5, "Bowler": 0.5,
@@ -40,7 +40,7 @@ elixir_dict = {"empty": 0.0, "Lightning": 0.6, "Furnace": 0.4, "GoblinBarrel": 0
                "ElectroDragon": 0.5, "InfernoTower": 0.5, "Balloon": 0.5, "BomberTower": 0.4, "Minions": 0.3,
                "MagicArcher": 0.0, "MinionHorde": 0.5, "LavaHound": 0.0, "Rocket": 0.6, "ElectorWizard": 0.0,
                "remain0": 0.0, "remain1": 0.0, "remain2": 0.0, "remain3": 0.0, "remain4": 0.0,
-               "remain5": 0.0, "remain6": 0.0, "remain7": 0.0}
+               "remain5": 0.0, "remain6": 0.0, "remain7": 0.0, "remain8": 0.0}
 
 
 def parse_frame_state(result):
@@ -48,41 +48,60 @@ def parse_frame_state(result):
     double_elixir = 1 if result.time > 60 * 2 - 1 else 0
     dead_im = 1 if result.time > 60 * 3 - 1 else 0
 
-    env_state = [result.opp_hp[0], result.opp_hp[1], result.opp_hp[2], result.mine_hp[0], result.mine_hp[1],
-                 result.mine_hp[2], result.remain_elixir / 10, remain_elixir, double_elixir, dead_im]
+    env_state = [result.remain_elixir / 10, remain_elixir, double_elixir, dead_im]
 
     card_type = np.array(result.card_type)
     card_available = np.array(result.available)
-    empty = [0 for _ in range(96)]
-    card0 = empty.copy()
-    card0[card_type[0]] = 1
-    card0[94] = card_available[0]
-    card0[95] = elixir_dict[card_dict[card_type[0]]]
-    card1 = empty.copy()
-    card1[card_type[0]] = 1
-    card1[94] = card_available[1]
-    card1[95] = elixir_dict[card_dict[card_type[1]]]
-    card2 = empty.copy()
-    card2[card_type[0]] = 1
-    card2[94] = card_available[2]
-    card2[95] = elixir_dict[card_dict[card_type[2]]]
-    card3 = empty.copy()
-    card3[card_type[0]] = 1
-    card3[94] = card_available[3]
-    card3[95] = elixir_dict[card_dict[card_type[3]]]
+    card_property = [card_available[0], elixir_dict[card_dict[card_type[0]]],
+                     card_available[1], elixir_dict[card_dict[card_type[1]]],
+                     card_available[2], elixir_dict[card_dict[card_type[2]]],
+                     card_available[3], elixir_dict[card_dict[card_type[3]]]]
+    return env_state, card_type, card_property
 
-    card_state = card0 + card1 + card2 + card3
 
-    return env_state, card_state
+def parse_card_type_and_property(card_state):
+    card_state_array = np.array(card_state)
+    if len(card_state_array.shape) == 1:
+        card_type = [card_state[0], card_state[3], card_state[6], card_state[9]]
+        card_property = card_state[1:3] + card_state[4:6] + card_state[7:9] + card_state[10:]
+    elif len(card_state_array.shape) == 2:
+        card0 = card_state_array[:, 0].reshape(-1, 1)
+        card1 = card_state_array[:, 3].reshape(-1, 1)
+        card2 = card_state_array[:, 6].reshape(-1, 1)
+        card3 = card_state_array[:, 9].reshape(-1, 1)
+        card_type = np.concatenate([card0, card1, card2, card3], axis=-1).astype(np.int)
+        card_property = np.concatenate([card_state[:, 1:3],
+                                        card_state[:, 4:6],
+                                        card_state[:, 7:9],
+                                        card_state[:, 10:]], axis=-1).astype(np.float)
+    else:
+        raise Exception("error card_state shape:{}".format(card_state.shape))
+    return card_type, card_property
 
 
 def calu_available_card(card_state):
-    card0 = card_state[:96]
-    card1 = card_state[96:96 * 2]
-    card2 = card_state[96 * 2:96 * 3]
-    card3 = card_state[96 * 3:]
-    available_card = np.array(card0[:94]) * card0[94] + np.array(card1[:94]) * card1[94] + \
-                     np.array(card2[:94]) * card2[94] + np.array(card3[:94]) * card3[94]
+    card_state = np.array(card_state)
+    if len(card_state.shape) == 1:
+
+        card0 = card_state[:96]
+        card1 = card_state[96:96 * 2]
+        card2 = card_state[96 * 2:96 * 3]
+        card3 = card_state[96 * 3:]
+        available_card = np.array(card0[:94]) * card0[94] + np.array(card1[:94]) * card1[94] + \
+                         np.array(card2[:94]) * card2[94] + np.array(card3[:94]) * card3[94]
+        # available_card[0] = 1
+    elif len(card_state.shape) == 2:
+        card0 = card_state[:, :96]
+        card1 = card_state[:, 96:96 * 2]
+        card2 = card_state[:, 96 * 2:96 * 3]
+        card3 = card_state[:, 96 * 3:]
+        available_card = np.array(card0[:, 94]) * np.array(card0[:, 94]).reshape(-1, 1) \
+                         + np.array(card1[:, 94]) * np.array(card1[:, 94]).reshape(-1, 1) \
+                         + np.array(card2[:, :94]) * np.array(card2[:, 94]).reshape(-1, 1) \
+                         + np.array(card3[:, :94]) * np.array(card3[:, 94]).reshape(-1, 1)
+        # available_card[:, 0] = 1
+    else:
+        raise Exception("error card_state shape:{}".format(card_state.shape))
     return available_card
 
 

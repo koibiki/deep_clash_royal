@@ -42,12 +42,12 @@ class Emulator(Device):
 
     def get_frame(self):
         time_mill = time.time() * 1000
-        if time_mill - self.pre_time < 500:
+        if time_mill - self.pre_time < 200:
             return [None, 1]
         else:
             self.pre_time = time_mill
         app = QApplication(sys.argv)
-        screens = QApplication.screens()
+        screens = app.screens()
         if len(screens) == 0:
             logger.info("screen :0")
             return [None, -1]

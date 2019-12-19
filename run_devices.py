@@ -16,8 +16,6 @@ if __name__ == '__main__':
     root = "F:\\gym_data\\clash_royal"
 
     device_id = "cd9faa7f"
-    # device_id = "90d1c810"
-    # device_id = "127.0.0.1:62001"
 
     # device = Mobile(device_id, host_address)
     device = Emulator(device_id, "one")
@@ -28,7 +26,7 @@ if __name__ == '__main__':
         frame, state_code = device.get_frame()
 
         if frame is not None:
-            host_observation = host.frame_step(frame)
+            host_observation = host.frame_step(frame, None)
             cv2.imshow("img", frame)
             cv2.waitKey(1)
         else:

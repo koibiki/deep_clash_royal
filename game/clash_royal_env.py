@@ -61,10 +61,7 @@ class ClashRoyalEnv:
         self.log = True
         self.retry = 0
         self.card_choices = [[340, 1720], [560, 1702], [738, 1698], [938, 1718]]
-        self.n_card_actions = 93
         self.img_shape = (256, 192, 3 * 4)
-        # 92种card是否可用 92种card消耗圣水量 (我方血量 对方血量) 剩余圣水量 耗时 双倍圣水 即死
-        self.state_shape = 1 + 92 * 3 + 2 + 1 + 1 + 1 + 1
 
         self.memory_record = []
         self.rate_of_winning = []
@@ -78,6 +75,7 @@ class ClashRoyalEnv:
         self.lib.detect_frame.restype = Result
 
         self.record = Record(root)
+        self.card_location = {}
 
     def _init_game(self, gameId):
         logger.info("init:" + str(gameId))
@@ -87,6 +85,7 @@ class ClashRoyalEnv:
         self.skip_step = 0
         self.running_frame_count = 0
         self.game_id = gameId
+        self.record.init_record(gameId)
         self.lib.init_game(gameId)
 
         self.imgs = []
@@ -96,13 +95,14 @@ class ClashRoyalEnv:
         # 我方3塔血量 敌方3塔血量 剩余圣水量 双倍圣水 即死
         self.env_states = []
         # 0 ~ 93 可用的card 92种card消耗圣水量
-        self.card_states = []
+        self.card_types = []
+        self.card_properties = []
 
         self.pre_mine_crown = 0
         self.pre_opp_crown = 0
         self.memory_record.append(gameId)
 
-    def frame_step(self, img):
+    def frame_step(self, img, actor_hidden):
         self.frame_count += 1
         result = Result()
 
@@ -110,9 +110,9 @@ class ClashRoyalEnv:
         result = self.lib.detect_frame(pymat, result)
 
         state = self._process_result(result, img)
-        if result.frame_state == STATE_DICT["RUNNING_STATE"] and result.frame_index >= 0 :# and self.game_start:
-            img_state, env_state, card_state = state
-            observation = [result.frame_index, img_state, env_state, card_state]
+        if result.frame_state == STATE_DICT["RUNNING_STATE"] and result.frame_index >= 0 and self.game_start:
+            img_state, env_state, card_type, card_properties = state
+            observation = [result.frame_index, img_state, env_state, card_type, card_properties, actor_hidden]
         else:
             observation = None
 
@@ -143,8 +143,8 @@ class ClashRoyalEnv:
 
     def _action_on_running(self, result, img):
         self.retry = 0
-        # if not self.game_start:
-        #     return
+        if not self.game_start:
+            return
         if self.log:
             logger.info(str(self.device_id) + "  running:" + str(result.frame_index) + "  " +
                         str(self.running_frame_count) + "  elixir:" + str(result.remain_elixir)
@@ -187,10 +187,16 @@ class ClashRoyalEnv:
 
         self._append_reward(reward, result.frame_index)
 
-        env_state, card_state = parse_frame_state(result)
+        env_state, card_type, card_property = parse_frame_state(result)
+
+        card_type = np.array(result.card_type)
+
+        self.card_location = {card_type[0]: self.card_choices[0], card_type[1]: self.card_choices[1],
+                              card_type[2]: self.card_choices[2], card_type[3]: self.card_choices[3]}
 
         self.env_states.append(env_state)
-        self.card_states.append(card_state)
+        self.card_types.append(card_type)
+        self.card_properties.append(card_property)
 
         img_state = img[self.offset_h: self.offset_h + self.height, self.offset_w: - self.offset_w, :]
         self.imgs.append(cv2.resize(img_state, (192, 256)))
@@ -198,7 +204,7 @@ class ClashRoyalEnv:
         if self.record:
             self.record.record_running_img(self.frame_count, self.imgs[result.frame_index])
 
-        return [img_state, env_state, card_state]
+        return [img_state, env_state, card_type, card_property]
 
     def _action_on_finish(self, result, img):
         self._finish_game()
@@ -228,7 +234,7 @@ class ClashRoyalEnv:
                 if self.retry > 0 and self.retry % 5 == 0:
                     self.retry = 0
                     # normal 548 544     548 944
-                    self.device.tap_button([548, 944])
+                    self.device.tap_button([548, 544])
 
             else:
                 if result.purple_loc[0] != 0:
@@ -253,48 +259,18 @@ class ClashRoyalEnv:
                 reward = 1 - result.time * 0.001
             elif result.battle_result == -1:
                 reward = -1 + result.time * 0.001
-            self._update_reward(reward, result.frame_index - 11)
+            self._update_reward(reward, result.frame_index - 10)
 
             if self.record:
                 self.record.record_finish_img(result.frame_index, img)
 
-                with open(osp.join(self.root, str(self.game_id) + "/state.txt"), "w") as f:
-                    for i in range(len(self.states[:self.running_frame_count - 10])):
-                        state_str = ""
-                        for item in self.states[i]:
-                            state_str += str(item) + ","
-                        state_str = state_str[:-1]
-                        f.write(str(i) + ":" + state_str)
-                        f.write("\n")
-                with open(osp.join(self.root, str(self.game_id) + "/action.txt"), "w") as f:
-                    for i in range(len(self.actions[:self.running_frame_count - 10])):
-                        f.write(str(i) + ":" + str(self.actions[i]))
-                        f.write("\n")
-                with open(osp.join(self.root, str(self.game_id) + "/reward.txt"), "w") as f:
-                    for i in range(len(self.rewards[:self.running_frame_count - 10])):
-                        f.write(str(i) + ":" + str(round(self.rewards[i], 1)))
-                        f.write("\n")
+                self.record.record_state(self.env_states[:result.frame_index - 9],
+                                         self.card_types[:result.frame_index - 9],
+                                         self.card_properties[:result.frame_index - 9])
 
-                old_path = osp.join(self.root, str(self.game_id))
-                result_path = "fail"
-                if result.battle_result == 1:
-                    result_path = "win"
-                elif result.battle_result == 0:
-                    result_path = "draw"
-
-                new_path = osp.join(self.root, result_path + "/" + str(self.game_id))
-                os.rename(old_path, new_path)
-
-            if len(self.rate_of_winning) > 20:
-                self.rate_of_winning.pop(0)
-            self.rate_of_winning.append(1 if result.battle_result == 1 else 0)
-
-            if len(self.reward_mean) > 50:
-                self.reward_mean.pop(0)
-
-            self.reward_mean.append(np.sum(self.rewards[:self.running_frame_count - 10]))
-
-            self.episode_record = self._episode_statistics(result)
+                self.record.record_actions(self.actions[:result.frame_index - 9])
+                self.record.record_rewards(self.rewards[:result.frame_index - 9])
+                self.record.finish_record(result.battle_result)
 
     def _finish_game(self):
         if self.retry % 50 == 0:
@@ -315,45 +291,29 @@ class ClashRoyalEnv:
                         ("++++++++++" if reward_value > 0 else "----------"))
         self.rewards.append(reward_value)
 
-    def step(self, observation, action):
-        index = observation[0]
-        if self.skip_step == 0 and action[0] != 0:
-            # 更新 选择了不可用 card 的 reward
-            if action[0] in observation[3]:
-                card_index = np.argmax([action[0] == item for item in observation[3]])
-                if observation[4][card_index] != 0:
-                    self.skip_step = 5
-                    card = self.card_choices[card_index]
-                    loc_x = int(action[1] * self.width * 2) + self.offset_w * 2
-                    loc_y = int(action[2] * self.height * 2) + self.offset_h * 2
-                    if self.real_time:
-                        self.device.swipe([card[0], card[1], loc_x, loc_y])
-            self.actions.append(action)
-        else:
-            logger.info("do nothing or skip step.")
-            self.actions.append([0, 0, 0])
+    def step(self, action):
+        """
+        {"use_card": (action_use_card.item(), use_card_prob[:, action_use_card.item()].item()),
+                "card": (action_card.item(), card_prob[:, action_card.item()].item()),
+                "pos_x": (action_pos_x.item(), pos_x_prob[:, action_pos_x.item()].item()),
+                "pos_y": (action_pos_y.item(), pos_y_prob[:, action_pos_y.item()].item()),
+                "choice_card": choice_card}, actor_hidden
+        :param action:
+        :return:
+        """
+        if action[0] != 0:
+            if action["use_card"][0] == 0:
+                logger.info("do nothing or skip step.")
+            else:
+                card = action["card"][0]
+                loc_x = int(action["pos_x"][0] * self.width * 2) + self.offset_w * 2
+                loc_y = int(action["pos_y"][0] * self.height * 2) + self.offset_h * 2
 
-    def _episode_statistics(self, result):
-        skip_step = 10
-        max_step = self.running_frame_count - skip_step
-
-        img_paths = []
-        type_dir = "fail"
-        if result.battle_result == 1:
-            type_dir = "win"
-        elif result.battle_result == 0:
-            type_dir = "draw"
-
-        save_dir = osp.join(self.root, type_dir + "/" + str(self.game_id)) + "/running"
-        for index in range(max_step):
-            indices = [index + 5, index, index - 5, index - 5 * 2, index - 5 * 3]
-            indices = [max(0, item) for item in indices]
-            indices = [min(item, max_step - 1) for item in indices]
-            img_path = [osp.join(save_dir, str(i) + ".jpg") for i in indices]
-            img_paths.append(img_path)
-        episode_record = [self.game_id, img_paths, self.states[:max_step], self.actions[:max_step],
-                          self.rewards[:max_step]]
-        return episode_record
+                start_x = self.card_location[card]
+                start_y = self.card_location[card]
+                if self.real_time:
+                    self.device.swipe([start_x, start_y, loc_x, loc_y])
+        self.actions.append(action)
 
     def reset(self):
         self.game_start = False
