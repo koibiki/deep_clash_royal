@@ -6,10 +6,8 @@ from torch.distributions import Categorical
 from torch.utils.tensorboard import SummaryWriter
 import time
 import os
-import os.path as osp
 import numpy as np
 
-from game.parse_result import parse_card_type_and_property
 from net.model import PpoNet
 
 
@@ -23,7 +21,7 @@ class PPO(object):
 
     def __init__(self, ):
         super(PPO, self).__init__()
-        self.device = torch.device("cuda:0" if not torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         self.ppo_net = PpoNet().to(self.device)
         self.counter = 0
@@ -35,22 +33,24 @@ class PPO(object):
         if not os.path.exists('./param'):
             os.makedirs('./param/net_param')
 
-    def select_action(self, observation):
-        return self.run_actor_action(np.array([observation[1]]), [observation[2]], [observation[3]],
-                                     [observation[4]], observation[5])
+    def _img_transform(self, img):
+        return np.array(img) / 255.
 
-    def run_actor_action(self, img, env_state, card_type, card_property, actor_hidden=None):
-        if actor_hidden is None:
-            actor_hidden = self.ppo_net.initHidden(len(img))
-        img = torch.from_numpy(img / 255.).float().to(self.device)
+    def gen_tensor(self, img, env_state, card_type, card_property):
+        img = torch.from_numpy(self._img_transform(img)).float().to(self.device)
         env_state = torch.from_numpy(np.array(env_state)).float().to(self.device)
         card_type = torch.from_numpy(np.array(card_type)).long().to(self.device)
         card_property = torch.from_numpy(np.array(card_property)).float().to(self.device)
+        return img, env_state, card_type, card_property
+
+    def select_action(self, img, env_state, card_type, card_property, actor_hidden=None):
+        if actor_hidden is None:
+            actor_hidden = self.ppo_net.initHidden(len(img))
+
+        img, env_state, card_type, card_property = self.gen_tensor(img, env_state, card_type, card_property)
         with torch.no_grad():
             action = self.ppo_net(img, env_state, card_type, card_property, actor_hidden=actor_hidden)['actor']
-        use_card_prob, card_prob, pos_x_prob, pos_y_prob, choice_card, actor_hidden = action
-        use_card = Categorical(use_card_prob)
-        action_use_card = use_card.sample()
+        card_prob, pos_x_prob, pos_y_prob, choice_card, actor_hidden = action
         card = Categorical(card_prob)
         action_card = card.sample()
         pos_x = Categorical(pos_x_prob)
@@ -63,15 +63,14 @@ class PPO(object):
                 "pos_y": (action_pos_y.item(), pos_y_prob[:, action_pos_y.item()].item()),
                 "choice_card": choice_card}, actor_hidden
 
-    def get_value(self, img, env_state, card_state, critic_hidden=None):
+    def get_value(self, img, env_state, card_type, card_property, critic_hidden=None):
         if critic_hidden is None:
             critic_hidden = self.ppo_net.initHidden(len(img))
-        img = torch.from_numpy(img / 255.).float().to(self.device)
-        env_state = torch.from_numpy(np.array(env_state)).float().to(self.device)
-        card_state = torch.from_numpy(np.array(card_state)).float().to(self.device)
+
+        img, env_state, card_type, card_property = self.gen_tensor(img, env_state, card_type, card_property)
         with torch.no_grad():
-            critic_result = self.ppo_net(img, env_state, card_state, critic_hidden=critic_hidden)['critic']
-            value, critic_hidden = critic_result
+            critic = self.ppo_net(img, env_state, card_type, card_property, critic_hidden=critic_hidden)['critic']
+            value, critic_hidden = critic
         return value.item(), critic_hidden
 
     def save_param(self):

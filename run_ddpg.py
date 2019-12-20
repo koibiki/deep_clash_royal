@@ -3,10 +3,9 @@ import time
 import cv2
 
 from brain.base_brain import BaseBrain
-from brain.policy import PolicyGradient
 from device.emulator import Emulator
 from device.mobile import Mobile
-from game.clash_royal import ClashRoyalEnv
+from game.clash_royal_env import ClashRoyalEnv
 
 if __name__ == '__main__':
 
@@ -38,8 +37,6 @@ if __name__ == '__main__':
                 host.step(host_observation, host_action)
 
             if host.game_start and host.game_finish and host.retry <= 1:
-                brain.update_episode_result(host.get_rate_of_winning())
-                brain.record_battle_result()
                 brain.load_model()
         else:
             if state_code == -1:

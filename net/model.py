@@ -67,9 +67,11 @@ class PpoNet(nn.Module):
         self.card_embed = nn.Embedding(94, self.embed_size)
         self.card_dense = nn.Sequential(nn.Linear(self.embed_size + 2, 256),
                                         nn.ReLU(),
-                                        nn.Linear(256, 64))
+                                        nn.Linear(256, 64),
+                                        nn.ReLU())
+        self.card_pooling = nn.MaxPool2d(kernel_size=(4, 1), stride=(4, 1), padding=0)
 
-        self.dense = nn.Linear(2132, 1024)
+        self.dense = nn.Linear(260, 1024)
 
         # actor
         self.actor_gru = nn.GRU(1024, self.hidden_size)
@@ -78,7 +80,12 @@ class PpoNet(nn.Module):
         self.pos_x = nn.Linear(1024, 6)
         self.pos_y = nn.Linear(1024, 8)
 
+        # critic
+        self.critic_gru = nn.GRU(1024, self.hidden_size)
+        self.value = nn.Linear(1024, 1)
+
     def forward(self, img, env_state, card_type, card_property, actor_hidden=None, critic_hidden=None):
+        device = img.device
         img = torch.Tensor.permute(img, (0, 3, 1, 2))
 
         battle_field_feature = self.battle_field_feature(img)
@@ -86,20 +93,24 @@ class PpoNet(nn.Module):
         card_embed = self.card_embed(card_type)
 
         card_embed0 = card_embed[:, 0]
-        card_state0 = F.relu(self.card_dense(torch.cat([card_embed0, card_property[:, :2]], dim=1)))
+        card_state0 = torch.unsqueeze(self.card_dense(torch.cat([card_embed0, card_property[:, :2]], dim=1)), dim=1)
 
         card_embed1 = card_embed[:, 1]
-        card_state1 = F.relu(self.card_dense(torch.cat([card_embed1, card_property[:, 2:4]], dim=1)))
+        card_state1 = torch.unsqueeze(self.card_dense(torch.cat([card_embed1, card_property[:, 2:4]], dim=1)), dim=1)
 
         card_embed2 = card_embed[:, 2]
-        card_state2 = F.relu(self.card_dense(torch.cat([card_embed2, card_property[:, 4:6]], dim=1)))
+        card_state2 = torch.unsqueeze(self.card_dense(torch.cat([card_embed2, card_property[:, 4:6]], dim=1)), dim=1)
 
         card_embed3 = card_embed[:, 3]
-        card_state3 = F.relu(self.card_dense(torch.cat([card_embed3, card_property[:, 6:]], dim=1)))
+        card_state3 = torch.unsqueeze(self.card_dense(torch.cat([card_embed3, card_property[:, 6:]], dim=1)), dim=1)
 
-        cat = torch.cat([battle_field_feature, env_state, card_state0, card_state1, card_state2, card_state3], dim=1)
+        card_cat = torch.cat([card_state0, card_state1, card_state2, card_state3], dim=1)
 
-        feature = F.relu(self.dense(cat))
+        card_state = torch.squeeze(self.card_pooling(card_cat), dim=1)
+
+        all_feature = torch.cat([battle_field_feature, env_state, card_state], dim=1)
+
+        feature = F.relu(self.dense(all_feature))
         feature = torch.Tensor.unsqueeze(feature, 0)
 
         result = {}
@@ -111,10 +122,11 @@ class PpoNet(nn.Module):
 
             action_intent = self.intent(actor_output)
 
-            card_embed = self.card_embed(self.card_indices)
+            card_embed = self.card_embed(self.card_indices.to(device))
             card = F.softmax(action_intent.float().mm(card_embed.t()), dim=1)
 
-            available_card = torch.from_numpy(calu_available_card(card_type.numpy(), card_property.numpy()))
+            available_card = torch.from_numpy(
+                calu_available_card(card_type.cpu().numpy(), card_property.cpu().numpy())).to(device)
             card = torch.mul(card, available_card)
 
             pos_x = F.softmax(self.pos_x(actor_output))
@@ -131,47 +143,8 @@ class PpoNet(nn.Module):
             critic_output, critic_hidden = self.critic_gru(feature, critic_hidden)
             critic_v = self.value(critic_output)
             result["critic"] = [critic_v, critic_hidden]
+
         return result
-
-    def initHidden(self, batch_size):
-        result = torch.zeros(1, batch_size, self.hidden_size)
-        if not torch.cuda.is_available():
-            return result.cuda()
-        else:
-            return result
-
-
-class CriticDDPG(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-        self.hidden_size = 1024
-
-        # img feature
-        self.battle_field_feature = BattleFieldFeature()
-        self.dense = nn.Linear(1024, 1024)
-
-        # critic
-        self.critic_gru = nn.GRU(1024, self.hidden_size)
-        self.q = nn.Linear(1024, 1)
-
-    def forward(self, img, env_state, card_state, critic_hidden, use_card, intent, pos_x, pos_y):
-        battle_field_feature = self.battle_field_feature(img)
-
-        action_intent = intent * use_card
-        action_pos_x = pos_x * use_card
-        action_pos_y = pos_y * use_card
-
-        cat = torch.cat([battle_field_feature, env_state, card_state, action_intent, action_pos_x, action_pos_y], dim=1)
-
-        feature = F.relu(self.dense(cat))
-        critic_feature = torch.Tensor.unsqueeze(feature, 0)
-
-        # critic run
-        critic_output, critic_hidden = self.critic_gru(critic_feature, critic_hidden)
-        critic_q = self.q(critic_output)
-
-        return critic_q
 
     def initHidden(self, batch_size):
         result = torch.zeros(1, batch_size, self.hidden_size)

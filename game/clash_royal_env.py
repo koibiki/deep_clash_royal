@@ -52,7 +52,6 @@ class ClashRoyalEnv:
         self.mode = mode
         self.name = name
         self.root = root
-        self.record = True
         self.scale = True
         self.real_time = True
         self.game_start = False
@@ -64,8 +63,7 @@ class ClashRoyalEnv:
         self.img_shape = (256, 192, 3 * 4)
 
         self.memory_record = []
-        self.rate_of_winning = []
-        self.reward_mean = []
+
         if sys.platform == 'win32':
             lib_path = "F:\\\\PyCharmProjects\\\\deep_clash_royal\\\\lib\\\\libc_opencv.dll"
         else:
@@ -83,7 +81,6 @@ class ClashRoyalEnv:
         self.game_finish = False
         self.frame_count = 0
         self.skip_step = 0
-        self.running_frame_count = 0
         self.game_id = gameId
         self.record.init_record(gameId)
         self.lib.init_game(gameId)
@@ -147,7 +144,7 @@ class ClashRoyalEnv:
             return
         if self.log:
             logger.info(str(self.device_id) + "  running:" + str(result.frame_index) + "  " +
-                        str(self.running_frame_count) + "  elixir:" + str(result.remain_elixir)
+                        str(len(self.env_states)) + "  elixir:" + str(result.remain_elixir)
                         + "  spent:" + str(result.milli))
 
             logger.info("{:s}:{:f}-{:s}:{:f}-{:s}:{:f}-{:s}:{:f}".format(CARD_DICT[result.card_type[0]],
@@ -167,7 +164,6 @@ class ClashRoyalEnv:
                                                                   result.mine_hp[2], ))
         if result.frame_index < 0:
             return
-        self.running_frame_count += 1
         self.skip_step = self.skip_step - 1 if self.skip_step > 0 else 0
 
         reward = 0
@@ -293,11 +289,10 @@ class ClashRoyalEnv:
 
     def step(self, action):
         """
-        {"use_card": (action_use_card.item(), use_card_prob[:, action_use_card.item()].item()),
-                "card": (action_card.item(), card_prob[:, action_card.item()].item()),
-                "pos_x": (action_pos_x.item(), pos_x_prob[:, action_pos_x.item()].item()),
-                "pos_y": (action_pos_y.item(), pos_y_prob[:, action_pos_y.item()].item()),
-                "choice_card": choice_card}, actor_hidden
+        {"card": (action_card.item(), card_prob[:, action_card.item()].item()),
+        "pos_x": (action_pos_x.item(), pos_x_prob[:, action_pos_x.item()].item()),
+        "pos_y": (action_pos_y.item(), pos_y_prob[:, action_pos_y.item()].item()),
+        "choice_card": choice_card}, actor_hidden
         :param action:
         :return:
         """
@@ -305,14 +300,17 @@ class ClashRoyalEnv:
             if action["use_card"][0] == 0:
                 logger.info("do nothing or skip step.")
             else:
-                card = action["card"][0]
-                loc_x = int(action["pos_x"][0] * self.width * 2) + self.offset_w * 2
-                loc_y = int(action["pos_y"][0] * self.height * 2) + self.offset_h * 2
+                try:
+                    card = action["card"][0]
+                    loc_x = int(action["pos_x"][0] * self.width * 2) + self.offset_w * 2
+                    loc_y = int(action["pos_y"][0] * self.height * 2) + self.offset_h * 2
 
-                start_x = self.card_location[card]
-                start_y = self.card_location[card]
-                if self.real_time:
-                    self.device.swipe([start_x, start_y, loc_x, loc_y])
+                    start_x = self.card_location[card]
+                    start_y = self.card_location[card]
+                    if self.real_time:
+                        self.device.swipe([start_x, start_y, loc_x, loc_y])
+                except Exception as e:
+                    print(e)
         self.actions.append(action)
 
     def reset(self):

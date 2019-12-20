@@ -27,10 +27,12 @@ if __name__ == '__main__':
         frame, state_code = device.get_frame()
 
         if frame is not None:
-            host_observation = host.frame_step(frame, actor_hidden)
-            if host_observation is not None:
-                host_action, actor_hidden = brain.select_action(host_observation)
-                host.step(host_action)
+            observation = host.frame_step(frame, actor_hidden)
+            if observation is not None:
+                img, env_state, card_type, card_property, actor_hidden = \
+                    [observation[1]], [observation[2]], [observation[3]], [observation[4]], observation[5]
+                action, actor_hidden = brain.select_action(img, env_state, card_type, card_property, actor_hidden)
+                host.step(action)
 
             if host.game_start and host.game_finish and host.retry <= 1:
                 # brain.load_model()
