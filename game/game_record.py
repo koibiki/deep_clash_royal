@@ -95,7 +95,8 @@ class Record(object):
 		elif result == 0:
 			result_path = "draw"
 
+		os.makedirs(os.path.join(self.root, result_path), exist_ok=True)
 		new_path = osp.join(self.root, result_path + "/" + str(self.game_id))
 		os.rename(old_path, new_path)
-		self.game_id = -1
 		self.record_episode_result(result)
+		self.game_id = -1

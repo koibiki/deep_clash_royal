@@ -1,36 +1,20 @@
-import ctypes
-import os
-import os.path as osp
-import platform
-
-from game.game_record import Record
-from utils.logger_utils import logger
-
-if "Windows" in platform.platform():
-    os.environ["path"] = \
-        "F:\\opencv-4.1.2\\build\\install;F:\\opencv-4.1.2\\build\\install\\x64\\mingw\\bin;" \
-        "F:\\opencv-4.1.2\\build\\install\\x64\\mingw\\lib;C:\\Windows\\system32;C:\\Windows;" \
-        "C:\\Windows\\System32\\Wbem;C:\\Windows\\System32\\WindowsPowerShell\\v1.0;" \
-        "C:\\Windows\\System32\\OpenSSH;C:\\Program Files (x86)\\NVIDIA Corporation\\PhysX\\Common;" \
-        "$HAVA_HOME\\bin;C:\\Program Files\\Git\\cmd;C:\\mingw64\\bin;F:\\adb;C:\\Program Files\\CMake\\bin;" \
-        "D:\\Anaconda3;C:\\Users\\orient\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Program Files (x86)\\CMake\\bin"
-
-import sys
 import time
 
 import cv2
-import numpy as np
 
 from config import CARD_DICT
+from game.game_env import ClashRoyalEnv
+from game.game_record import Record
 from game.parse_result import parse_frame_state
-from utils.c_lib_utils import Result, STATE_DICT, convert2pymat
+from utils.c_lib_utils import STATE_DICT
+from utils.logger_utils import logger
 
 """
 仅支持 1920 * 1080 分辨率的屏幕
 """
 
 
-class ClashRoyalEnv:
+class Agent:
     MODE = {"battle": 0,
             "friend_battle_host": 1,
             "friend_battle_guest": 2}
@@ -68,32 +52,26 @@ class ClashRoyalEnv:
 
         self.memory_record = []
 
-        if sys.platform == 'win32':
-            lib_path = "F:\\\\PyCharmProjects\\\\deep_clash_royal\\\\lib\\\\libc_opencv.dll"
-        else:
-            lib_path = "./lib/libc_opencv.so"
-
-        self.lib = ctypes.cdll.LoadLibrary(lib_path)
-        self.lib.detect_frame.restype = Result
+        self.game_env = ClashRoyalEnv()
 
         self.record = Record(root)
         self.card_location = {}
 
     def _init_game(self, gameId):
-        logger.info("init:" + str(gameId))
+        logger.info("agent {} init: {}".format(self.agent_id, gameId))
         self.game_start = True
         self.game_finish = False
         self.frame_count = 0
         self.skip_step = 0
         self.game_id = gameId
         self.record.init_record(gameId)
-        self.lib.init_game(gameId)
+        self.game_env.init_game(gameId, self.agent_id)
 
         self.imgs = []
 
         self.rewards = []
         self.actions = []
-        # 我方3塔血量 敌方3塔血量 剩余圣水量 双倍圣水 即死
+        # 剩余圣水量 双倍圣水 即死
         self.env_states = []
         # 0 ~ 93 可用的card 92种card消耗圣水量
         self.card_types = []
@@ -105,10 +83,8 @@ class ClashRoyalEnv:
 
     def frame_step(self, img, actor_hidden):
         self.frame_count += 1
-        result = Result()
 
-        pymat = convert2pymat(img)
-        result = self.lib.detect_frame(pymat, result, self.agent_id)
+        result = self.game_env.detect_frame(img, self.agent_id)
 
         state = self._process_result(result, img)
         if result.frame_state == STATE_DICT["RUNNING_STATE"] and result.frame_index >= 0 and self.game_start:

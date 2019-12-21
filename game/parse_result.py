@@ -48,14 +48,15 @@ def parse_frame_state(result):
     double_elixir = 1 if result.time > 60 * 2 - 1 else 0
     dead_im = 1 if result.time > 60 * 3 - 1 else 0
 
-    env_state = [result.remain_elixir / 10, remain_elixir, double_elixir, dead_im]
+    env_state = [remain_elixir, double_elixir, dead_im]
 
     card_type = np.array(result.card_type)
     card_available = np.array(result.available)
-    card_property = [card_available[0], elixir_dict[card_dict[card_type[0]]],
-                     card_available[1], elixir_dict[card_dict[card_type[1]]],
-                     card_available[2], elixir_dict[card_dict[card_type[2]]],
-                     card_available[3], elixir_dict[card_dict[card_type[3]]]]
+    card_type = [int(card_type[0]), int(card_type[1]), int(card_type[2]), int(card_type[3]), ]
+    card_property = [int(card_available[0]) * 1., elixir_dict[card_dict[card_type[0]]],
+                     int(card_available[1]) * 1., elixir_dict[card_dict[card_type[1]]],
+                     int(card_available[2]) * 1., elixir_dict[card_dict[card_type[2]]],
+                     int(card_available[3]) * 1., elixir_dict[card_dict[card_type[3]]]]
     return env_state, card_type, card_property
 
 
