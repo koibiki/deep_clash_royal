@@ -3,6 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 import torchvision
 import numpy as np
+from torch.distributions import Categorical
 
 from game.parse_result import calu_available_card
 
@@ -50,6 +51,45 @@ class BattleFieldFeature(nn.Module):
         return x
 
 
+class ChoiceProcessor(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        pass
+
+    def forward(self, card_prob, pos_x_vector, pos_y_vector, card_embed):
+        if self.training:
+            choice_index = Categorical(card_prob).sample()
+        else:
+            choice_index = torch.argmax(card_prob, dim=-1)
+        choice_card = card_embed[choice_index]
+
+        pos_x_vector_transpose = torch.Tensor.permute(pos_x_vector, (1, 0, 2))
+        pos_y_vector_transpose = torch.Tensor.permute(pos_y_vector, (1, 0, 2))
+
+        pos_x_choice = torch.Tensor.permute(pos_x_vector_transpose * choice_card, (1, 0, 2))
+        pos_y_choice = torch.Tensor.permute(pos_y_vector_transpose * choice_card, (1, 0, 2))
+
+        pos_x_prob = F.softmax(torch.sum(pos_x_choice, dim=-1))
+        pos_y_prob = F.softmax(torch.sum(pos_y_choice, dim=-1))
+
+        if self.training:
+            pos_x = Categorical(pos_x_prob).sample()
+            pos_y = Categorical(pos_y_prob).sample()
+        else:
+            pos_x = torch.argmax(pos_x_prob, dim=-1)
+            pos_y = torch.argmax(pos_y_prob, dim=-1)
+
+        action = {'card': [int(i) for i in choice_index.cpu().numpy()],
+                  'card_prob': [float(card_prob[i, index].item()) for i, index in enumerate(choice_index.cpu().numpy())],
+                  'pos_x': [int(i) for i in pos_x.cpu().numpy()],
+                  'pos_x_prob': [float(pos_x_prob[i, index].item()) for i, index in enumerate(pos_x.cpu().numpy())],
+                  'pos_y': [int(i) for i in pos_y.cpu().numpy()],
+                  'pos_y_prob': [float(pos_y_prob[i, index].item()) for i, index in enumerate(pos_y.cpu().numpy())]}
+
+        return action, choice_card
+
+
 class PpoNet(nn.Module):
     def __init__(self):
         super().__init__()
@@ -61,8 +101,6 @@ class PpoNet(nn.Module):
 
         # card indices
         self.card_indices = torch.from_numpy(np.array([i for i in range(self.card_amount)])).long()
-        if torch.cuda.is_available():
-            self.card_indices = self.card_indices.cuda()
 
         # img feature
         self.battle_field_feature = BattleFieldFeature()
@@ -75,14 +113,15 @@ class PpoNet(nn.Module):
                                         nn.ReLU())
         self.card_pooling = nn.MaxPool2d(kernel_size=(4, 1), stride=(4, 1), padding=0)
 
-        self.dense = nn.Linear(260, self.hidden_size)
+        self.dense = nn.Linear(259, self.hidden_size)
 
         # actor
         self.actor_gru = nn.GRU(self.hidden_size, self.hidden_size)
-        self.use_card = nn.Linear(self.hidden_size, 2)
         self.intent = nn.Linear(self.hidden_size, self.embed_size)
         self.pos_x = nn.Linear(self.hidden_size, 6 * self.embed_size)
         self.pos_y = nn.Linear(self.hidden_size, 5 * self.embed_size)
+
+        self.choice_processor = ChoiceProcessor()
 
         # critic
         self.critic_gru = nn.GRU(self.hidden_size, self.hidden_size)
@@ -90,6 +129,7 @@ class PpoNet(nn.Module):
 
     def forward(self, img, env_state, card_type, card_property, actor_hidden=None, critic_hidden=None):
         device = img.device
+        card_indices = self.card_indices.to(device)
         card_embed = self.card_embed(card_type)
 
         card_embed0 = card_embed[:, 0]
@@ -121,27 +161,23 @@ class PpoNet(nn.Module):
         if actor_hidden is not None:
             actor_output, actor_hidden = self.actor_gru(feature, actor_hidden)
 
-            actor_output = torch.squeeze(actor_output, 1)
+            actor_output = torch.squeeze(actor_output, 0)
 
             action_intent = self.intent(actor_output)
 
-            card_embed = self.card_embed(self.card_indices.to(device))
+            card_embed = self.card_embed(card_indices)
             card = F.softmax(action_intent.float().mm(card_embed.t()), dim=1)
 
             available_card = torch.from_numpy(
                 calu_available_card(card_type.cpu().numpy(), card_property.cpu().numpy())).to(device)
-            card = torch.mul(card, available_card)
-
-            choice_index = torch.argmax(card).cpu().numpy()
-            choice_card = card_embed[choice_index]
+            card_prob = torch.mul(card, available_card)
 
             pos_x_vector = self.pos_x(actor_output).view((-1, 6, self.embed_size))
             pos_y_vector = self.pos_y(actor_output).view((-1, 5, self.embed_size))
 
-            pos_x = F.softmax(torch.sum(pos_x_vector * choice_card, dim=-1))
-            pos_y = F.softmax(torch.sum(pos_y_vector * choice_card, dim=-1))
+            action, choice_card = self.choice_processor(card_prob, pos_x_vector, pos_y_vector, card_embed)
 
-            result["actor"] = [card, pos_x, pos_y, choice_card, actor_hidden]
+            result["actor"] = [action, choice_card, actor_hidden]
 
         # critic run
         if critic_hidden is not None:
@@ -151,9 +187,5 @@ class PpoNet(nn.Module):
 
         return result
 
-    def initHidden(self, batch_size):
-        result = torch.zeros(1, batch_size, self.hidden_size)
-        if torch.cuda.is_available():
-            return result.cuda()
-        else:
-            return result
+    def init_hidden(self, batch_size, device):
+        return torch.zeros(1, batch_size, self.hidden_size).to(device)

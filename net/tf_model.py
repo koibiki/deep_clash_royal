@@ -110,15 +110,15 @@ class PpoNet(tf.keras.Model):
             action_intent = self.intent(actor_output)
 
             card_embed = self.card_embed(self.card_indices)
-            card = self.softmax(tf.matmul(action_intent, card_embed, transpose_b=True))
+            card_prob = self.softmax(tf.matmul(action_intent, card_embed, transpose_b=True))
 
             available_card = tf.convert_to_tensor(calu_available_card(card_type.numpy(), card_property.numpy()),
                                                   dtype=tf.float32)
-            card = tf.multiply(card, available_card)
+            card_prob = tf.multiply(card_prob, available_card)
 
-            choice_index = tf.argmax(card, axis=-1)
-            choice_index = tf.one_hot(choice_index, self.card_amount)
-            choice_card = tf.matmul(choice_index, card_embed)
+            card_choice_index = tf.argmax(card_prob, axis=-1)
+            card_choice_index = tf.one_hot(card_choice_index, self.card_amount)
+            choice_card = tf.matmul(card_choice_index, card_embed)
 
             pos_x_vector = tf.reshape(self.pos_x(actor_output), (-1, 6, self.embed_size))
             pos_y_vector = tf.reshape(self.pos_y(actor_output), (-1, 5, self.embed_size))
@@ -129,10 +129,10 @@ class PpoNet(tf.keras.Model):
             pos_x_choice = tf.transpose(pos_x_vector_transpose * choice_card, (1, 0, 2))
             pos_y_choice = tf.transpose(pos_y_vector_transpose * choice_card, (1, 0, 2))
 
-            pos_x = self.softmax(tf.reduce_sum(pos_x_choice, axis=-1))
-            pos_y = self.softmax(tf.reduce_sum(pos_y_choice, axis=-1))
+            pos_x_prob = self.softmax(tf.reduce_sum(pos_x_choice, axis=-1))
+            pos_y_prob = self.softmax(tf.reduce_sum(pos_y_choice, axis=-1))
 
-            result["actor"] = [card.numpy(), pos_x.numpy(), pos_y.numpy(), choice_card.numpy(), actor_hidden]
+            result["actor"] = [card_prob.numpy(), pos_x_prob.numpy(), pos_y_prob.numpy(), choice_card.numpy(), actor_hidden]
 
         # critic run
         if critic_hidden is not None:
@@ -142,5 +142,5 @@ class PpoNet(tf.keras.Model):
 
         return result
 
-    def initialize_hidden_state(self, batch_size):
+    def initialize_hidden_state(self):
         return tf.zeros((1, self.hidden_size))
