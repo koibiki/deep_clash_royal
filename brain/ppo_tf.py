@@ -1,10 +1,8 @@
-import tensorflow as tf
-# from torch.utils.tensorboard import SummaryWriter
-import time
 import os
 import numpy as np
 
 from net.tf_model import PpoNet
+from utils.func_call import func_time
 from utils.tf_util import gen_tf_tensor
 
 
@@ -33,23 +31,27 @@ class PPO(object):
     def _img_transform(self, img):
         return np.array(img).astype(np.float) / 255.
 
+    @func_time
     def select_action(self, img, env_state, card_type, card_property, actor_hidden=None):
         if actor_hidden is None:
-            actor_hidden = self.ppo_net.initialize_hidden_state(len(img))
+            actor_hidden = self.ppo_net.initialize_hidden_state()
 
-        img, env_state, card_type, card_property = gen_tf_tensor(self._img_transform(img), env_state, card_type,
-                                                                 card_property)
+        img, env_state, card_type, card_property = \
+            gen_tf_tensor(self._img_transform(img), env_state, card_type, card_property)
 
         action = self.ppo_net(img, env_state, card_type, card_property, actor_hidden=actor_hidden)['actor']
         card_prob, pos_x_prob, pos_y_prob, choice_card, actor_hidden = action
 
         action_card = np.argmax(card_prob, -1)
+        action_card_prob = np.max(card_prob, -1)
         action_pos_x = np.argmax(pos_x_prob, -1)
+        action_pos_x_prob = np.max(pos_x_prob, -1)
         action_pos_y = np.argmax(pos_y_prob, -1)
+        action_pos_y_prob = np.max(pos_y_prob, -1)
 
-        return {"card": (action_card, card_prob[:, action_card]),
-                "pos_x": (action_pos_x, pos_x_prob[:, action_pos_x]),
-                "pos_y": (action_pos_y, pos_y_prob[:, action_pos_y]),
-                "choice_card": choice_card}, actor_hidden
-        return "action", actor_hidden
-
+        return {"card": [int(i) for i in list(action_card)],
+                'card_prob': [float(i) for i in list(action_card_prob)],
+                "pos_x": [int(i) for i in list(action_pos_x)],
+                "pos_x_prob": [float(i) for i in list(action_pos_x_prob)],
+                "pos_y": [int(i) for i in list(action_pos_y)],
+                "pos_y_prob": [float(i) for i in list(action_pos_y_prob)]}, choice_card, actor_hidden

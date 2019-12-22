@@ -127,14 +127,18 @@ class Agent:
                         str(len(self.env_states)) + "  elixir:" + str(result.remain_elixir)
                         + "  spent:" + str(result.milli))
 
-            logger.info("{:s}:{:f}-{:s}:{:f}-{:s}:{:f}-{:s}:{:f}".format(CARD_DICT[result.card_type[0]],
-                                                                         result.prob[0],
-                                                                         CARD_DICT[result.card_type[1]],
-                                                                         result.prob[1],
-                                                                         CARD_DICT[result.card_type[2]],
-                                                                         result.prob[2],
-                                                                         CARD_DICT[result.card_type[3]],
-                                                                         result.prob[3], ))
+            logger.info("{:s}:{:f}:{}-{:s}:{:f}:{}-{:s}:{:f}:{}-{:s}:{:f}:{}".format(CARD_DICT[result.card_type[0]],
+                                                                                      result.prob[0],
+                                                                                      result.available[0],
+                                                                                      CARD_DICT[result.card_type[1]],
+                                                                                      result.prob[1],
+                                                                                      result.available[1],
+                                                                                      CARD_DICT[result.card_type[2]],
+                                                                                      result.prob[2],
+                                                                                      result.available[2],
+                                                                                      CARD_DICT[result.card_type[3]],
+                                                                                      result.prob[3],
+                                                                                      result.available[3], ))
 
             logger.info("hp:{:f}-{:f}-{:f}-{:f}-{:f}-{:f}".format(result.opp_hp[0],
                                                                   result.opp_hp[1],
@@ -272,10 +276,9 @@ class Agent:
 
     def step(self, action):
         """
-        {"card": (action_card.item(), card_prob[:, action_card.item()].item()),
-        "pos_x": (action_pos_x.item(), pos_x_prob[:, action_pos_x.item()].item()),y
-        "pos_y": (action_pos_y.item(), pos_y_prob[:, action_pos_y.item()].item()),
-        "choice_card": choice_card}, actor_hidden
+        {"card": (action_card, card_prob),
+        "pos_x": (action_pos_x, pos_x_prob),
+        "pos_y": (action_pos_y, pos_y_prob)}, actor_hidden
         :param action:
         :return:
         """
@@ -287,18 +290,19 @@ class Agent:
                 card = action["card"][0]
                 # loc_x = int(action["pos_x"][0] * self.width // 6 + self.width // 12) + self.offset_w * 2
                 # loc_y = int(action["pos_y"][0] * self.height * 2 // 8 + self.height * 6 // 8) + self.offset_h * 2
-                loc_x = int(self.x * self.width // 6 + self.width // 12) + self.offset_w * 2
+                loc_x = int(self.x * self.width * 2 // 6 + self.width * 2 // 6 // 2) + self.offset_w * 2
                 loc_y = int(self.y * self.height * 2 // 8 + self.height * 6 // 8) + self.offset_h * 2
                 self.x = (self.x + 1) % 6
                 self.y = (self.y + 1) % 5
                 start_x = self.card_location[card][0]
                 start_y = self.card_location[card][1]
-                logger.info("locate card {} {} {}.".format(card, action["pos_x"][0], action["pos_y"][0]))
+                logger.info(
+                    "locate card {} {} {} {} {}.".format(card, action["pos_x"][0], action["pos_y"][0], loc_x, loc_y))
                 if self.real_time:
                     self.device.swipe([start_x, start_y, loc_x, loc_y])
             except Exception as e:
                 print(e)
-        self.actions.append(action)
+        self.actions.append({'card': action['card'], 'pos_x': action["pos_x"], 'pos_y': action["pos_y"]})
 
     def reset(self):
         self.game_start = False

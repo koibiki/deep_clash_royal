@@ -2,6 +2,7 @@ import numpy as np
 import os
 import os.path as osp
 from tqdm import *
+import random
 
 
 class SumTree(object):
@@ -157,6 +158,7 @@ class Memory(object):  # stored as ( s, a, r, s_ ) in SumTree
 
     def _load_fail_memory(self, root):
         listdir = os.listdir(root)
+        random.shuffle(listdir)
         for dir_name in tqdm(listdir, "load fail memory"):
             game_id = int(dir_name)
             dir_path = osp.join(root, dir_name)
@@ -166,6 +168,7 @@ class Memory(object):  # stored as ( s, a, r, s_ ) in SumTree
 
     def _load_win_memory(self, root):
         listdir = os.listdir(root)
+        random.shuffle(listdir)
         for dir_name in tqdm(listdir, desc="load win memory"):
             game_id = int(dir_name)
             dir_path = osp.join(root, dir_name)

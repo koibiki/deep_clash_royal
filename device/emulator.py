@@ -42,7 +42,7 @@ class Emulator(Device):
 
     def get_frame(self):
         time_mill = time.time() * 1000
-        if time_mill - self.pre_time < 200:
+        if time_mill - self.pre_time < 800:
             return [None, 1]
         else:
             self.pre_time = time_mill
