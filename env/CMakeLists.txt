@@ -1,7 +1,10 @@
-cmake_minimum_required(VERSION 3.12.2)
+cmake_minimum_required(VERSION 3.14)
+
 project(env)
 
+
 set(CMAKE_CXX_STANDARD 14)
+
 
 find_package(OpenCV REQUIRED)
 
@@ -24,7 +27,8 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 
 target_link_libraries(c_opencv ${OpenCV_LIBS})
 
-add_executable(env main2.cpp)
+add_executable(env main.cpp)
+
 
 target_link_libraries(env c_opencv)
 
