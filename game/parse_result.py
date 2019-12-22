@@ -94,13 +94,14 @@ def calu_available_card(card_type, card_property):
         available_cards = []
         for i, c in enumerate(card_type):
             available_card = [0 for _ in range(94)]
-            available_card[c[0]] = 0 if card_property[i][0] < 0.1 else 1
-            available_card[c[1]] = 0 if card_property[i][2] < 0.1 else 1
-            available_card[c[2]] = 0 if card_property[i][4] < 0.1 else 1
-            available_card[c[3]] = 0 if card_property[i][6] < 0.1 else 1
-            available_card[0] = 1
+            available_card = np.asarray([available_card])
+            available_card[:,c[0]] = 0 if card_property[i][0] < 0.1 else 1
+            available_card[:,c[1]] = 0 if card_property[i][2] < 0.1 else 1
+            available_card[:,c[2]] = 0 if card_property[i][4] < 0.1 else 1
+            available_card[:,c[3]] = 0 if card_property[i][6] < 0.1 else 1
+            available_card[:,0] = 1
             available_cards.append(available_card)
-        available_cards = np.concatenate(available_cards, axis=-1)
+        available_cards = np.concatenate(available_cards, axis=0)
         return available_cards
     else:
         raise Exception("error card_state shape:{}".format(card_state.shape))

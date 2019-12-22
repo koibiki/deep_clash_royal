@@ -90,7 +90,6 @@ class PpoNet(nn.Module):
 
     def forward(self, img, env_state, card_type, card_property, actor_hidden=None, critic_hidden=None):
         device = img.device
-
         card_embed = self.card_embed(card_type)
 
         card_embed0 = card_embed[:, 0]
