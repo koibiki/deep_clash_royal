@@ -4,8 +4,8 @@
 
 #include "agent.h"
 
-ClashRoyalAgent::ClashRoyalAgent() {
-    std::cout << "c++ init ClashRoyalAgent." << std::endl;
+ClashRoyalAgent::ClashRoyalAgent(int agent_id) {
+    std::cout <<"agent:" << agent_id <<" c++ init ClashRoyalAgent." << std::endl;
 }
 
 result ClashRoyalAgent::detect_frame(py_mat mat, result r) {
@@ -160,6 +160,8 @@ void ClashRoyalAgent::init_agent(int gameId) {
     }
     this->finish_count = 0;
 }
+
+
 
 
 

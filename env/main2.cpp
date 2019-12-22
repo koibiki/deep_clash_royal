@@ -13,7 +13,7 @@ using namespace std;
 
 int main() {
     std::cout << "Hello, World!" << std::endl;
-
+    printf("%d.%d.%d", cv::getVersionRevision(), cv::getVersionMinor(), cv::getVersionMajor());
     RunningDetect runningDetect;
 
     FinishDetect finishDetect;

@@ -103,7 +103,7 @@ private:
 
 public:
 
-    ClashRoyalAgent();
+    ClashRoyalAgent(int agent_id);
 
     void init_agent(int gameId);
 

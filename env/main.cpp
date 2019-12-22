@@ -60,7 +60,7 @@ int main() {
     }
 
 
-    ClashRoyalAgent clashRoyalAgent;
+    ClashRoyalAgent clashRoyalAgent(0);
 
     int gameId = 10080;
     clashRoyalAgent.init_agent(0);
