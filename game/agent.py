@@ -180,9 +180,6 @@ class Agent:
         img_state = cv2.resize(img_state, (192, 256))
         self.imgs.append(img_state)
 
-        if self.record:
-            self.record.record_running_img(self.frame_count, self.imgs[result.frame_index])
-
         return [img_state, env_state, card_type, card_property]
 
     def _action_on_finish(self, result, img):
@@ -239,17 +236,19 @@ class Agent:
                 reward = 1 - result.time * 0.001
             elif result.battle_result == -1:
                 reward = -1 + result.time * 0.001
-            self._update_reward(reward, result.frame_index - 10)
+            self._update_reward(reward, len(self.rewards) - 8)
 
             if self.record:
                 self.record.record_finish_img(result.frame_index, img)
 
-                self.record.record_state(self.env_states[:result.frame_index - 9],
-                                         self.card_types[:result.frame_index - 9],
-                                         self.card_properties[:result.frame_index - 9])
+                self.record.record_running_img(self.imgs[:-7])
 
-                self.record.record_actions(self.actions[:result.frame_index - 9])
-                self.record.record_rewards(self.rewards[:result.frame_index - 9])
+                self.record.record_state(self.env_states[:- 7],
+                                         self.card_types[:- 7],
+                                         self.card_properties[:-7])
+
+                self.record.record_actions(self.actions[:-7])
+                self.record.record_rewards(self.rewards[:-7])
                 self.record.finish_record(result.battle_result)
 
     def _finish_game(self):
@@ -271,8 +270,8 @@ class Agent:
                         ("++++++++++" if reward_value > 0 else "----------"))
         self.rewards.append(reward_value)
 
-    x = 0
-    y = 0
+    # x = 0
+    # y = 0
 
     def step(self, action):
         """
@@ -282,27 +281,26 @@ class Agent:
         :param action:
         :return:
         """
-
+        skip = False
         if action["card"][0] == 0:
             logger.info("do nothing or skip step.")
         else:
-            try:
-                card = action["card"][0]
-                # loc_x = int(action["pos_x"][0] * self.width // 6 + self.width // 12) + self.offset_w * 2
-                # loc_y = int(action["pos_y"][0] * self.height * 2 // 8 + self.height * 6 // 8) + self.offset_h * 2
-                loc_x = int(self.x * self.width * 2 // 6 + self.width * 2 // 6 // 2) + self.offset_w * 2
-                loc_y = int(self.y * self.height * 2 // 8 + self.height * 6 // 8) + self.offset_h * 2
-                self.x = (self.x + 1) % 6
-                self.y = (self.y + 1) % 5
-                start_x = self.card_location[card][0]
-                start_y = self.card_location[card][1]
-                logger.info(
-                    "locate card {} {} {} {} {}.".format(card, action["pos_x"][0], action["pos_y"][0], loc_x, loc_y))
-                if self.real_time:
-                    self.device.swipe([start_x, start_y, loc_x, loc_y])
-            except Exception as e:
-                print(e)
+            card = action["card"][0]
+            loc_x = (int(action["pos_x"][0] * self.width // 6 + self.width // 6 // 2) + self.offset_w) * 2
+            loc_y = (int(action["pos_y"][0] * self.height // 8 + self.height // 8 // 2) + self.offset_h) * 2
+            # loc_x = (int(self.x * self.width // 6 + self.width // 6 // 2) + self.offset_w) * 2
+            # loc_y = (int(self.y * self.height // 8 + self.height // 8 // 2) + self.offset_h) * 2
+            # self.x = (self.x + 1) % 6
+            # self.y = (self.y + 1) % 8
+            start_x = self.card_location[card][0]
+            start_y = self.card_location[card][1]
+            logger.info(
+                "locate card {} {} {} {} {}.".format(card, action["pos_x"][0], action["pos_y"][0], loc_x, loc_y))
+            if self.real_time:
+                self.device.swipe([start_x, start_y, loc_x, loc_y])
+            skip = True
         self.actions.append({'card': action['card'], 'pos_x': action["pos_x"], 'pos_y': action["pos_y"]})
+        return skip
 
     def reset(self):
         self.game_start = False

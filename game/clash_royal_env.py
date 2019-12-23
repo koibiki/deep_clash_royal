@@ -303,26 +303,25 @@ class ClashRoyalEnv:
         :param action:
         :return:
         """
-
+        skip = False
         if action["card"][0] == 0:
             logger.info("do nothing or skip step.")
         else:
-            try:
-                card = action["card"][0]
-                # loc_x = int(action["pos_x"][0] * self.width // 6 + self.width // 12) + self.offset_w * 2
-                # loc_y = int(action["pos_y"][0] * self.height * 2 // 8 + self.height * 6 // 8) + self.offset_h * 2
-                loc_x = int(self.x * self.width // 6 + self.width // 12) + self.offset_w * 2
-                loc_y = int(self.y * self.height * 2 // 8 + self.height * 6 // 8) + self.offset_h * 2
-                self.x = (self.x + 1) % 6
-                self.y = (self.y + 1) % 5
-                start_x = self.card_location[card][0]
-                start_y = self.card_location[card][1]
-                logger.info("locate card {} {} {}.".format(card, action["pos_x"][0], action["pos_y"][0]))
-                if self.real_time:
-                    self.device.swipe([start_x, start_y, loc_x, loc_y])
-            except Exception as e:
-                print(e)
-        self.actions.append(action)
+            card = action["card"][0]
+            # loc_x = int(action["pos_x"][0] * self.width // 6 + self.width // 12) + self.offset_w * 2
+            # loc_y = int(action["pos_y"][0] * self.height * 2 // 8 + self.height * 6 // 8) + self.offset_h * 2
+            loc_x = int(self.x * self.width // 6 + self.width // 12) + self.offset_w * 2
+            loc_y = int(self.y * self.height * 2 // 8) + self.offset_h * 2
+            self.x = (self.x + 1) % 6
+            self.y = (self.y + 1) % 5
+            start_x = self.card_location[card][0]
+            start_y = self.card_location[card][1]
+            logger.info("locate card {} {} {}.".format(card, action["pos_x"][0], action["pos_y"][0]))
+            if self.real_time:
+                self.device.swipe([start_x, start_y, loc_x, loc_y])
+            skip = True
+
+        self.actions.append(action), skip
 
     def reset(self):
         self.game_start = False

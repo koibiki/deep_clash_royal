@@ -54,11 +54,14 @@ class ChoiceProcessor(nn.Module):
         super().__init__()
         pass
 
-    def forward(self, card_prob, pos_x_vector, pos_y_vector, card_embed):
-        if self.training:
-            choice_index = Categorical(card_prob).sample()
+    def forward(self, card_prob, pos_x_vector, pos_y_vector, card_embed, skip):
+        if skip:
+            choice_index = torch.from_numpy(np.array([0 for _ in range(len(card_prob))])).long()
         else:
-            choice_index = torch.argmax(card_prob, dim=-1)
+            if self.training:
+                choice_index = Categorical(card_prob).sample()
+            else:
+                choice_index = torch.argmax(card_prob, dim=-1)
         choice_card = card_embed[choice_index]
 
         pos_x_vector_transpose = torch.Tensor.permute(pos_x_vector, (1, 0, 2))
@@ -67,8 +70,8 @@ class ChoiceProcessor(nn.Module):
         pos_x_choice = torch.Tensor.permute(pos_x_vector_transpose * choice_card, (1, 0, 2))
         pos_y_choice = torch.Tensor.permute(pos_y_vector_transpose * choice_card, (1, 0, 2))
 
-        pos_x_prob = F.softmax(torch.sum(pos_x_choice, dim=-1))
-        pos_y_prob = F.softmax(torch.sum(pos_y_choice, dim=-1))
+        pos_x_prob = F.softmax(torch.sum(pos_x_choice, dim=-1), dim=-1)
+        pos_y_prob = F.softmax(torch.sum(pos_y_choice, dim=-1), dim=-1)
 
         if self.training:
             pos_x = Categorical(pos_x_prob).sample()
@@ -124,7 +127,7 @@ class PpoNet(nn.Module):
         self.critic_gru = nn.GRU(self.hidden_size, self.hidden_size)
         self.value = nn.Linear(self.hidden_size, 1)
 
-    def forward(self, img, env_state, card_type, card_property, actor_hidden=None, critic_hidden=None):
+    def forward(self, img, env_state, card_type, card_property, actor_hidden=None, critic_hidden=None, skip=False):
         device = img.device
         card_indices = self.card_indices.to(device)
         card_embed = self.card_embed(card_type)
@@ -172,7 +175,7 @@ class PpoNet(nn.Module):
             pos_x_vector = self.pos_x(actor_output).view((-1, 6, self.embed_size))
             pos_y_vector = self.pos_y(actor_output).view((-1, 8, self.embed_size))
 
-            action, choice_card = self.choice_processor(card_prob, pos_x_vector, pos_y_vector, card_embed)
+            action, choice_card = self.choice_processor(card_prob, pos_x_vector, pos_y_vector, card_embed, skip)
 
             result["actor"] = [action, choice_card, actor_hidden]
 

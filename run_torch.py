@@ -4,7 +4,6 @@ from brain.ppo_torch import PPO
 from device.emulator import Emulator
 import numpy as np
 
-
 if __name__ == '__main__':
 
     brain = PPO()
@@ -27,7 +26,8 @@ if __name__ == '__main__':
 
     guest_actor_hidden = None
     guest_critic_hidden = None
-
+    host_skip = False
+    guest_skip = False
     while True:
         host_frame, host_state_code = host_device.get_frame()
 
@@ -39,12 +39,13 @@ if __name__ == '__main__':
                     [host_observation[1]], [host_observation[2]], [host_observation[3]], [host_observation[4]], \
                     host_observation[5]
                 host_action, _, host_actor_hidden = brain.select_action(img, env_state, card_type, card_property,
-                                                                     host_actor_hidden)
-                host.step(host_action)
+                                                                        actor_hidden=host_actor_hidden, skip=host_skip)
+                host_skip = host.step(host_action)
 
             if host.game_start and host.game_finish and host.retry <= 1:
                 # brain.load_model()
                 host_actor_hidden = None
+                host_skip = False
 
             cv2.imshow("host", host_frame)
         else:
@@ -53,19 +54,19 @@ if __name__ == '__main__':
         guest_frame, guest_state_code = guest_device.get_frame()
 
         if guest_frame is not None:
-
             guest_observation = guest.frame_step(guest_frame, guest_actor_hidden)
             if guest_observation is not None:
                 img, env_state, card_type, card_property, guest_actor_hidden = \
                     [guest_observation[1]], [guest_observation[2]], [guest_observation[3]], [guest_observation[4]], \
                     guest_observation[5]
                 guest_action, _, guest_actor_hidden = brain.select_action(img, env_state, card_type, card_property,
-                                                                       guest_actor_hidden)
-                guest.step(guest_action)
+                                                                          actor_hidden=guest_actor_hidden, skip=guest_skip)
+                guest_skip = guest.step(guest_action)
 
             if guest.game_start and guest.game_finish and guest.retry <= 1:
                 # brain.load_model()
                 guest_actor_hidden = None
+                guest_skip = False
 
             cv2.imshow("guest", guest_frame)
         else:

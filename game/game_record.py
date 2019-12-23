@@ -59,9 +59,10 @@ class Record(object):
 		self.check_game_valid()
 		cv2.imwrite(osp.join(self.error_dir, "{:d}.jpg".format(index)), img)
 
-	def record_running_img(self, index, img):
+	def record_running_img(self, imgs):
 		self.check_game_valid()
-		cv2.imwrite(osp.join(self.running_dir, "{:d}.jpg".format(index)), img)
+		for i in range(len(imgs)):
+			cv2.imwrite(osp.join(self.running_dir, "{:d}.jpg".format(i)), imgs[i])
 
 	def record_finish_img(self, index, img):
 		self.check_game_valid()
@@ -69,8 +70,8 @@ class Record(object):
 
 	def record_state(self, env_state, card_type, card_properties):
 		self.check_game_valid()
-		self._record_json(osp.join(self.save_dir, "env_state.json"), env_state)
-		self._record_json(osp.join(self.save_dir, "card_type.json"), card_type)
+		self._record_json(osp.join(self.save_dir, "env_states.json"), env_state)
+		self._record_json(osp.join(self.save_dir, "card_types.json"), card_type)
 		self._record_json(osp.join(self.save_dir, "card_properties.json"), card_properties)
 
 	def record_actions(self, actions):
