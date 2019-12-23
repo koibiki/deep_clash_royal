@@ -19,28 +19,25 @@ class BattleFieldFeature(nn.Module):
         resnet = torchvision.models.resnet18(False)
         self.conv1 = resnet.conv1
         self.bn1 = resnet.bn1
-        self.relu = resnet.relu
         self.maxpool = resnet.maxpool
 
         self.layer1 = resnet.layer1
         self.layer2 = resnet.layer2
         self.layer3 = resnet.layer3
         self.layer4 = resnet.layer4
-        self.downsample = nn.Conv2d(512, 8, 3, 1)
+        self.downsample = nn.Conv2d(512, 32, 3, 1, padding=1)
         self.dp = nn.Dropout()
 
     def forward(self, x):
         x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
+        x = F.relu(self.bn1(x))
         x = self.maxpool(x)
 
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
-        x = self.downsample(x)
-        x = self.relu(x)
+        x = F.relu(self.downsample(x))
 
         if self.training:
             x = self.dp(x)
@@ -113,13 +110,13 @@ class PpoNet(nn.Module):
                                         nn.ReLU())
         self.card_pooling = nn.MaxPool2d(kernel_size=(4, 1), stride=(4, 1), padding=0)
 
-        self.dense = nn.Linear(259, self.hidden_size)
+        self.dense = nn.Linear(1603, self.hidden_size)
 
         # actor
         self.actor_gru = nn.GRU(self.hidden_size, self.hidden_size)
         self.intent = nn.Linear(self.hidden_size, self.embed_size)
         self.pos_x = nn.Linear(self.hidden_size, 6 * self.embed_size)
-        self.pos_y = nn.Linear(self.hidden_size, 5 * self.embed_size)
+        self.pos_y = nn.Linear(self.hidden_size, 8 * self.embed_size)
 
         self.choice_processor = ChoiceProcessor()
 
@@ -173,7 +170,7 @@ class PpoNet(nn.Module):
             card_prob = torch.mul(card, available_card)
 
             pos_x_vector = self.pos_x(actor_output).view((-1, 6, self.embed_size))
-            pos_y_vector = self.pos_y(actor_output).view((-1, 5, self.embed_size))
+            pos_y_vector = self.pos_y(actor_output).view((-1, 8, self.embed_size))
 
             action, choice_card = self.choice_processor(card_prob, pos_x_vector, pos_y_vector, card_embed)
 

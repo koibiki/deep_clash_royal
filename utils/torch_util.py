@@ -8,3 +8,4 @@ def gen_torch_tensor(img, env_state, card_type, card_property, device):
     card_type = torch.from_numpy(np.array(card_type).astype(np.int)).long().to(device)
     card_property = torch.from_numpy(np.array(card_property).astype(np.float)).float().to(device)
     return img, env_state, card_type, card_property
+
