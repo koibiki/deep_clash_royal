@@ -236,19 +236,21 @@ class Agent:
                 reward = 1 - result.time * 0.001
             elif result.battle_result == -1:
                 reward = -1 + result.time * 0.001
-            self._update_reward(reward, len(self.rewards) - 8)
+
+            skip_frame = 2
+            self._update_reward(reward, len(self.rewards) - skip_frame)
 
             if self.record:
                 self.record.record_finish_img(result.frame_index, img)
 
-                self.record.record_running_img(self.imgs[:-7])
+                self.record.record_running_img(self.imgs[:-skip_frame])
 
-                self.record.record_state(self.env_states[:- 7],
-                                         self.card_types[:- 7],
-                                         self.card_properties[:-7])
+                self.record.record_state(self.env_states[:- skip_frame],
+                                         self.card_types[:- skip_frame],
+                                         self.card_properties[:-skip_frame])
 
-                self.record.record_actions(self.actions[:-7])
-                self.record.record_rewards(self.rewards[:-7])
+                self.record.record_actions(self.actions[:-skip_frame])
+                self.record.record_rewards(self.rewards[:-skip_frame])
                 self.record.finish_record(result.battle_result)
 
     def _finish_game(self):
@@ -281,7 +283,7 @@ class Agent:
         :param action:
         :return:
         """
-        skip = False
+        choice_index = None
         if action["card"][0] == 0:
             logger.info("do nothing or skip step.")
         else:
@@ -298,9 +300,9 @@ class Agent:
                 "locate card {} {} {} {} {}.".format(card, action["pos_x"][0], action["pos_y"][0], loc_x, loc_y))
             if self.real_time:
                 self.device.swipe([start_x, start_y, loc_x, loc_y])
-            skip = True
-        self.actions.append({'card': action['card'], 'pos_x': action["pos_x"], 'pos_y': action["pos_y"]})
-        return skip
+            choice_index = [0]
+        self.actions.append(action)
+        return choice_index
 
     def reset(self):
         self.game_start = False

@@ -45,8 +45,8 @@ elixir_dict = {"empty": 0.0, "Lightning": 0.6, "Furnace": 0.4, "GoblinBarrel": 0
 
 def parse_frame_state(result):
     remain_elixir = result.remain_elixir / 10
-    double_elixir = 1 if result.time > 60 * 2 - 1 else 0
-    dead_im = 1 if result.time > 60 * 3 - 1 else 0
+    double_elixir = 1. if result.time > 60 * 2 - 1 else 0.
+    dead_im = 1. if result.time > 60 * 3 - 1 else 0.
 
     env_state = [remain_elixir, double_elixir, dead_im]
 

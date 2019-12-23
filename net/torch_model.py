@@ -54,9 +54,9 @@ class ChoiceProcessor(nn.Module):
         super().__init__()
         pass
 
-    def forward(self, card_prob, pos_x_vector, pos_y_vector, card_embed, skip):
-        if skip:
-            choice_index = torch.from_numpy(np.array([0 for _ in range(len(card_prob))])).long()
+    def forward(self, card_prob, pos_x_vector, pos_y_vector, card_embed, choice_index=None):
+        if choice_index is not None:
+            choice_index = torch.from_numpy(np.array(choice_index)).long()
         else:
             if self.training:
                 choice_index = Categorical(card_prob).sample()
@@ -127,7 +127,7 @@ class PpoNet(nn.Module):
         self.critic_gru = nn.GRU(self.hidden_size, self.hidden_size)
         self.value = nn.Linear(self.hidden_size, 1)
 
-    def forward(self, img, env_state, card_type, card_property, actor_hidden=None, critic_hidden=None, skip=False):
+    def forward(self, img, env_state, card_type, card_property, actor_hidden=None, critic_hidden=None, choice_index=None):
         device = img.device
         card_indices = self.card_indices.to(device)
         card_embed = self.card_embed(card_type)
@@ -175,7 +175,7 @@ class PpoNet(nn.Module):
             pos_x_vector = self.pos_x(actor_output).view((-1, 6, self.embed_size))
             pos_y_vector = self.pos_y(actor_output).view((-1, 8, self.embed_size))
 
-            action, choice_card = self.choice_processor(card_prob, pos_x_vector, pos_y_vector, card_embed, skip)
+            action, choice_card = self.choice_processor(card_prob, pos_x_vector, pos_y_vector, card_embed, choice_index)
 
             result["actor"] = [action, choice_card, actor_hidden]
 
@@ -183,6 +183,7 @@ class PpoNet(nn.Module):
         if critic_hidden is not None:
             critic_output, critic_hidden = self.critic_gru(feature, critic_hidden)
             critic_v = self.value(critic_output)
+            critic_v = torch.squeeze(critic_v, 0)
             result["critic"] = [critic_v, critic_hidden]
 
         return result
