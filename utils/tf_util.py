@@ -15,6 +15,17 @@ def sample_action(card_prob, pos_x_prob, pos_y_prob, choice_card):
     pass
 
 
+def roulette_wheel_selection(data):
+    m = random.uniform(0, 1)
+    total_prob = 0
+    i = 0
+    for i, prob in data:
+        total_prob += prob
+        if total_prob >= m:
+            return i
+    return i
+
+
 def roulette_sample(datas):
     choice_indices = []
     choice_probs = []

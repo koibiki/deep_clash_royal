@@ -1,5 +1,27 @@
 from brain.ppo_torch import PPO
 import numpy as np
+import random
+reward = [0, 0, 0, 0.1, 0, 0, 0.2, 0, 0, 0, 0, 0, 0.6, 0, 0, 0.1, 0, 0.1, -0.3, 0, 0.2, 1]
+
+Gt = []
+R = 0
+for r in reward[::-1]:
+    R = r + 0.5 * R
+    Gt.insert(0, R)
+
+
+def roulette_wheel_selection(data):
+    m = random.uniform(0, 1)
+    total_prob = 0
+    i = 0
+    for i, prob in data:
+        total_prob += prob
+        if total_prob >= m:
+            return i
+    return i
+
+roulette_wheel_selection([0.1, 0.3, 0.2 ,0.4])
+
 
 brain = PPO()
 

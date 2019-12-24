@@ -13,6 +13,7 @@ class ClayRoyalDataset(data.Dataset):
         self.root = root
         self.transforms = transforms
 
+        self.gamma = 0.99
         self.data = self.read_game_data(root)
 
     def update(self, ):
@@ -59,7 +60,15 @@ class ClayRoyalDataset(data.Dataset):
         reward = reward[start_index: start_index + 10]
         reward = np.array(reward, dtype=np.float32)
 
-        return imgs, env_states, card_types, card_properties, action_index, action_prob, reward
+        gt_reward = []
+        R = 0
+        for r in reward[::-1]:
+            R = r + self.gamma * R
+            gt_reward.insert(0, R)
+
+        gt_reward = np.array(gt_reward, dtype=np.float32)
+
+        return imgs, env_states, card_types, card_properties, action_index, action_prob, gt_reward
 
     def __len__(self):
         return len(self.data)

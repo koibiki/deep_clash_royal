@@ -98,6 +98,9 @@ class PPO(object):
                     critic, critic_hidden = result['critic']
 
                 advantage = gt_reward - critic
+
+                # advantage = (advantage - torch.mean(advantage)) / (torch.std(advantage) + 1e-8)
+
                 new_card_prob = torch.from_numpy(np.array(action['card_prob']))
                 old_card_log_prob = action_prob[:, step_count - 1, 0]
                 ratio = torch.div(new_card_prob, old_card_log_prob).view((-1, 1))
@@ -110,18 +113,18 @@ class PPO(object):
                 pos_x_surr1 = pos_x_ratio * advantage
                 pos_x_surr2 = torch.clamp(pos_x_ratio, 1 - self.clip_param, 1 + self.clip_param) * advantage
 
-                new_pos_y_prob = torch.from_numpy(np.array(action['pos_x_prob']))
+                new_pos_y_prob = torch.from_numpy(np.array(action['pos_y_prob']))
                 old_pos_y_log_prob = action_prob[:, step_count - 1, 2]
                 pos_y_ratio = torch.div(new_pos_y_prob, old_pos_y_log_prob).view((-1, 1))
                 pos_y_surr1 = pos_y_ratio * advantage
                 pos_y_surr2 = torch.clamp(pos_y_ratio, 1 - self.clip_param, 1 + self.clip_param) * advantage
 
+                self.optimizer.zero_grad()
                 # update actor critic network
                 card_action_loss = -torch.min(card_surr1, card_surr2).mean()  # MAX->MIN desent
                 pos_x_action_loss = -torch.min(pos_x_surr1, pos_x_surr2).mean()
                 pos_y_action_loss = -torch.min(pos_y_surr1, pos_y_surr2).mean()
 
-                self.optimizer.zero_grad()
                 value_loss = F.mse_loss(gt_reward, critic)
                 all_loss = card_action_loss + pos_x_action_loss + pos_y_action_loss + value_loss
 
