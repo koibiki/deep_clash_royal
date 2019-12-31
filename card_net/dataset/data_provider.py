@@ -43,14 +43,15 @@ class DataProvider(object):
         return imread, type_label, available_label
 
     def generate_train_input_fn(self):
-        root = "F:\gym_data\card"
+        root = "F:\\gym_data\\card"
         batch_size = cfg.TRAIN.BATCH_SIZE
 
         def _input_fn():
             img_paths, type_label, available_label = self._create_dataset_from_dir(root)
 
             dataset = tf.data.Dataset.from_tensor_slices((img_paths, type_label, available_label)) \
-                .map(lambda item1, item2, item3: tf.py_func(self._map_func, [item1, item2, item2], [tf.float32, tf.int32, tf.int32])) \
+                .map(lambda item1, item2, item3: tf.py_func(self._map_func, [item1, item2, item2],
+                                                            [tf.float32, tf.int32, tf.int32])) \
                 .shuffle(100)
             dataset = dataset.repeat()
             dataset = dataset.prefetch(32 * batch_size)
