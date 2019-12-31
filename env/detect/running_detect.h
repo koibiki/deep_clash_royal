@@ -15,11 +15,12 @@ struct RunningResult {
     double milli = 0.0;
 };
 
-class RunningDetect : protected BaseDetect {
+class RunningDetect : public BaseDetect {
 private:
-    int COLOR_DICT[2][3][2] = {
+    int COLOR_DICT[3][3][2] = {
             {{35,  85},  {35,  85},  {195, 255}},
             {{225, 255}, {175, 215}, {85,  115}},
+            {{65, 100}, {65, 100}, {225, 255}},
     };
 
     Rect opp_pattern_rect = {15, 55, 24, 30};
@@ -37,6 +38,8 @@ private:
     Rect get_crown_num_rect(Mat &src, bool is_opp);
 
     int get_most_possible_num(Mat &src, bool is_opp);
+
+    bool has_split_line(Mat &src);
 
 public:
 

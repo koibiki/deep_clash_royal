@@ -30,9 +30,18 @@ protected:
 
     bool debug = true;
 
-    cv::Mat binary_thresh_mat(cv::Mat &src, const int (*color_dict)[3][2], int color_index);
+//    cv::Mat binary_thresh_mat(cv::Mat &src, const int (*color_dict)[3][2], int color_index);
 
     float similar_percent(cv::Mat &src, cv::Mat &pattern);
+
+public:
+    cv::Mat diff_mat(cv::Mat &src, cv::Mat &pattern, int thresh=50);
+
+    static cv::Mat noise_filter(cv::Mat &src);
+
+
+    cv::Mat binary_thresh_mat(cv::Mat &src, const int (*color_dict)[3][2], int color_index);
+    static cv::Mat exract_attention(cv::Mat &src, cv::Mat &mask);
 };
 
 

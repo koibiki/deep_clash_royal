@@ -27,7 +27,7 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 
 target_link_libraries(c_opencv ${OpenCV_LIBS})
 
-add_executable(env main.cpp)
+add_executable(env main3.cpp)
 
 
 target_link_libraries(env c_opencv)
