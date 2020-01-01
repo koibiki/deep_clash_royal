@@ -2,7 +2,7 @@ import tensorflow as tf
 from tensorflow.keras import layers, Sequential
 
 from game.parse_result import calu_available_card
-from net.resnet import resnet18
+from net.resnet_tf import resnet18
 import numpy as np
 
 

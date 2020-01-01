@@ -4,8 +4,10 @@ import torch.nn.functional as F
 import torchvision
 import numpy as np
 from torch.distributions import Categorical
+from torchvision.models.resnet import BasicBlock
 
 from game.parse_result import calu_available_card
+from net.resnet_torch import ResNet
 
 """
 借鉴openai five 使用embedding 及 动作softmax, 位置softmax
@@ -16,35 +18,15 @@ class BattleFieldFeature(nn.Module):
 
     def __init__(self):
         super().__init__()
-        resnet = torchvision.models.resnet18(False)
-        self.conv1 = resnet.conv1
-        self.bn1 = resnet.bn1
-        self.maxpool = resnet.maxpool
-
-        self.layer1 = resnet.layer1
-        self.layer2 = resnet.layer2
-        self.layer3 = resnet.layer3
-        self.layer4 = resnet.layer4
-        self.downsample = nn.Conv2d(512, 32, 3, 1, padding=1)
-        self.dp = nn.Dropout()
+        self.resnet = ResNet(BasicBlock, [1, 1, 1, 1])
+        self.downsample = nn.Conv2d(256, 32, 3, 1, padding=1)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = F.relu(self.bn1(x))
-        x = self.maxpool(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+        x = self.resnet(x)
         x = F.relu(self.downsample(x))
-
-        if self.training:
-            x = self.dp(x)
 
         b, c, h, w = x.size()
         x = torch.Tensor.view(x, (b, c * h * w))
-
         return x
 
 
@@ -55,8 +37,11 @@ class ChoiceProcessor(nn.Module):
         pass
 
     def forward(self, card_prob, pos_x_vector, pos_y_vector, card_embed, choice_index=None):
+        device = card_prob.device
         if choice_index is not None:
-            choice_index = torch.from_numpy(np.array(choice_index)).long()
+            choice_index = torch.from_numpy(np.array(choice_index)).to(device) if type(
+                choice_index) == list else choice_index
+            choice_index = choice_index.long()
         else:
             if self.training:
                 choice_index = Categorical(card_prob).sample()
@@ -81,7 +66,8 @@ class ChoiceProcessor(nn.Module):
             pos_y = torch.argmax(pos_y_prob, dim=-1)
 
         action = {'card': [int(i) for i in choice_index.cpu().numpy()],
-                  'card_prob': [float(card_prob[i, index].item()) for i, index in enumerate(choice_index.cpu().numpy())],
+                  'card_prob': [float(card_prob[i, index].item()) for i, index in
+                                enumerate(choice_index.cpu().numpy())],
                   'pos_x': [int(i) for i in pos_x.cpu().numpy()],
                   'pos_x_prob': [float(pos_x_prob[i, index].item()) for i, index in enumerate(pos_x.cpu().numpy())],
                   'pos_y': [int(i) for i in pos_y.cpu().numpy()],
@@ -94,8 +80,8 @@ class PpoNet(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.hidden_size = 512
-        self.embed_size = 64
+        self.hidden_size = 256
+        self.embed_size = 32
 
         self.card_amount = 94
 
@@ -107,9 +93,9 @@ class PpoNet(nn.Module):
 
         # card index embed
         self.card_embed = nn.Embedding(self.card_amount, self.embed_size)
-        self.card_dense = nn.Sequential(nn.Linear(self.embed_size + 2, 256),
+        self.card_dense = nn.Sequential(nn.Linear(self.embed_size + 2, 128),
                                         nn.ReLU(),
-                                        nn.Linear(256, 64),
+                                        nn.Linear(128, 64),
                                         nn.ReLU())
         self.card_pooling = nn.MaxPool2d(kernel_size=(4, 1), stride=(4, 1), padding=0)
 
@@ -127,7 +113,8 @@ class PpoNet(nn.Module):
         self.critic_gru = nn.GRU(self.hidden_size, self.hidden_size)
         self.value = nn.Linear(self.hidden_size, 1)
 
-    def forward(self, img, env_state, card_type, card_property, actor_hidden=None, critic_hidden=None, choice_index=None):
+    def forward(self, img, env_state, card_type, card_property, actor_hidden=None, critic_hidden=None,
+                choice_index=None):
         device = img.device
         card_indices = self.card_indices.to(device)
         card_embed = self.card_embed(card_type)
