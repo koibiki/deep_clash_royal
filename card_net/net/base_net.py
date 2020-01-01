@@ -4,7 +4,7 @@ import time
 
 import tensorflow as tf
 
-from config import cfg
+from card_net.config import cfg
 
 
 class BaseNet:
