@@ -57,7 +57,7 @@ result ClashRoyalAgent::detect_mat(Mat src, result r) {
                     Mat card_mat = src(rects[i]);
                     const CardResult &cardResult = this->cardDetect.predict(card_mat);
                     r.available[i] = cardResult.available;
-                    if (cardResult.prob < 0.95) {
+                    if (cardResult.prob < 0.98) {
                         r.card_type[i] = pre_type[i];
                     } else {
                         r.card_type[i] = cardResult.card_type;
@@ -103,7 +103,7 @@ result ClashRoyalAgent::detect_mat(Mat src, result r) {
                 Mat card_mat = src(rects[i]);
                 const CardResult &cardResult = this->cardDetect.predict(card_mat);
                 r.available[i] = cardResult.available;
-                if (cardResult.prob < 0.95) {
+                if (cardResult.prob < 0.98) {
                     r.card_type[i] = pre_type[i];
                 } else {
                     r.card_type[i] = cardResult.card_type;

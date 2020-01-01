@@ -23,7 +23,7 @@ bool CardDetect::load_model(string mode_path) {
 }
 
 CardResult CardDetect::predict(Mat &src) {
-    Mat inputBlob = cv::dnn::blobFromImage(src, 1. / 255, Size(96, 96), cv::Scalar(), false, false);
+    Mat inputBlob = cv::dnn::blobFromImage(src, 1. / 255, Size(64, 64), cv::Scalar(), false, false);
     net.setInput(inputBlob, "input");//set the network input, "data" is the name of the input layer
 
     vector<cv::String> blobNames;

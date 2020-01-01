@@ -16,7 +16,30 @@ int main() {
     };
 
     std::cout << "Hello, World!" << std::endl;
-    RunningDetect runningDetect;
+    
+    
+    CardDetect cardDetect;
+    cardDetect.load_model("./asset/frozen_model.pb");
+
+
+    Mat mat = cv::imread("../84.jpg");
+    cv::resize(mat, mat, cv::Size(63, 64));
+
+    CardResult predict = cardDetect.predict(mat);
+
+    cout << "predict:" << predict.card_type << endl;
+
+
+
+
+
+
+
+
+
+
+
+         RunningDetect runningDetect;
 
     VideoCapture capture("../test2.mp4");//获取视频
     if (!capture.isOpened())
