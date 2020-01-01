@@ -7,6 +7,7 @@ from game.game_env import ClashRoyalEnv
 from game.game_record import Record
 from game.parse_result import parse_frame_state
 from utils.c_lib_utils import STATE_DICT
+from utils.img_utils import extract_attention
 from utils.logger_utils import logger
 
 """
@@ -66,6 +67,7 @@ class Agent:
         self.game_id = gameId
         self.record.init_record(gameId)
         self.game_env.init_game(gameId, self.agent_id)
+        self.pattern = None
 
         self.imgs = []
 
@@ -147,7 +149,8 @@ class Agent:
                                                                   result.mine_hp[1],
                                                                   result.mine_hp[2], ))
         if result.frame_index == -1:
-            self.record.record_pattern(self._crop_battle_filed(img))
+            self.pattern = self._crop_battle_filed(img)
+            self.record.record_pattern(self.pattern)
         if result.frame_index < 0:
             return
         self.skip_step = self.skip_step - 1 if self.skip_step > 0 else 0
@@ -182,7 +185,9 @@ class Agent:
         img_state = cv2.resize(img_state, (192, 256))
         self.imgs.append(img_state)
 
-        return [img_state, env_state, card_type, card_property]
+        img_diff = extract_attention(img_state, self.pattern)
+
+        return [img_diff, env_state, card_type, card_property]
 
     def _crop_battle_filed(self, img):
         return img[self.offset_h: self.offset_h + self.height, self.offset_w: - self.offset_w, :]

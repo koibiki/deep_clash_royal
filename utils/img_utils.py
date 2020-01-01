@@ -2,6 +2,8 @@ import numpy as np
 import random
 import cv2
 
+from utils.func_call import func_time
+
 mate_color_dict = {"purple": [[100, 180], [10, 100], [100, 181]],
                    "white": [[220, 255], [220, 255], [220, 255]],
                    "red": [[0, 34], [0, 34], [142, 178]],
@@ -27,12 +29,8 @@ def thresh_pic(img, color_keys):
 
     return bg
 
-
+@func_time
 def extract_attention(img, pattern, diff_thresh=10, area_thresh=100):
-
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    pattern = cv2.cvtColor(pattern, cv2.COLOR_BGR2GRAY)
-
     np_abs = np.abs(img.astype(float) - pattern.astype(float))
 
     diff_value = np_abs if len(np_abs.shape) == 2 else np.mean(np_abs, axis=-1)

@@ -6,6 +6,8 @@ import cv2
 import numpy as np
 import torch.utils.data as data
 
+from utils.img_utils import extract_attention
+
 
 class ClayRoyalDataset(data.Dataset):
 
@@ -13,7 +15,7 @@ class ClayRoyalDataset(data.Dataset):
         self.root = root
         self.transforms = transforms
 
-        self.gamma = 0.99
+        self.gamma = 0.995
         self.data = self.read_game_data(root)
 
     def update(self, ):
@@ -23,10 +25,19 @@ class ClayRoyalDataset(data.Dataset):
         img_id = self.data[index]
         start_index = random.randint(0, img_id[1] - 10)
 
+        pattern_path = os.path.join(img_id[0], "pattern.jpg")
+
+        if os.path.exists(pattern_path):
+            pattern = cv2.imread(pattern_path)
+        else:
+            pattern = cv2.imread(os.path.join(img_id[0], "running/0.jpg"))
+
         imgs = []
         for i in range(start_index, start_index + 10):
             img_path = os.path.join(img_id[0], "running/{}.jpg".format(i))
-            imgs.append(cv2.imread(img_path))
+            img = cv2.imread(img_path)
+            # img = extract_attention(img, pattern)
+            imgs.append(img)
         imgs = np.array(imgs, dtype=np.float32)
 
         env_states_path = os.path.join(img_id[0], "env_states.json")
@@ -57,7 +68,7 @@ class ClayRoyalDataset(data.Dataset):
         reward_path = os.path.join(img_id[0], "rewards.json")
         with open(reward_path) as f:
             reward = json.load(f)
-        reward = reward[start_index: start_index + 10]
+
         reward = np.array(reward, dtype=np.float32)
 
         gt_reward = []
@@ -66,6 +77,7 @@ class ClayRoyalDataset(data.Dataset):
             R = r + self.gamma * R
             gt_reward.insert(0, R)
 
+        gt_reward = gt_reward[start_index: start_index + 10]
         gt_reward = np.array(gt_reward, dtype=np.float32)
 
         return imgs, env_states, card_types, card_properties, action_index, action_prob, gt_reward
