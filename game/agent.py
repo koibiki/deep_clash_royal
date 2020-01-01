@@ -2,7 +2,7 @@ import time
 
 import cv2
 
-from config import CARD_DICT
+from game.parse_result import card_dict as CARD_DICT
 from game.game_env import ClashRoyalEnv
 from game.game_record import Record
 from game.parse_result import parse_frame_state
@@ -128,17 +128,17 @@ class Agent:
                         + "  spent:" + str(result.milli))
 
             logger.info("{:s}:{:f}:{}-{:s}:{:f}:{}-{:s}:{:f}:{}-{:s}:{:f}:{}".format(CARD_DICT[result.card_type[0]],
-                                                                                      result.prob[0],
-                                                                                      result.available[0],
-                                                                                      CARD_DICT[result.card_type[1]],
-                                                                                      result.prob[1],
-                                                                                      result.available[1],
-                                                                                      CARD_DICT[result.card_type[2]],
-                                                                                      result.prob[2],
-                                                                                      result.available[2],
-                                                                                      CARD_DICT[result.card_type[3]],
-                                                                                      result.prob[3],
-                                                                                      result.available[3], ))
+                                                                                     result.prob[0],
+                                                                                     result.available[0],
+                                                                                     CARD_DICT[result.card_type[1]],
+                                                                                     result.prob[1],
+                                                                                     result.available[1],
+                                                                                     CARD_DICT[result.card_type[2]],
+                                                                                     result.prob[2],
+                                                                                     result.available[2],
+                                                                                     CARD_DICT[result.card_type[3]],
+                                                                                     result.prob[3],
+                                                                                     result.available[3], ))
 
             logger.info("hp:{:f}-{:f}-{:f}-{:f}-{:f}-{:f}".format(result.opp_hp[0],
                                                                   result.opp_hp[1],
@@ -146,6 +146,8 @@ class Agent:
                                                                   result.mine_hp[0],
                                                                   result.mine_hp[1],
                                                                   result.mine_hp[2], ))
+        if result.frame_index == -1:
+            self.record.record_pattern(self._crop_battle_filed(img))
         if result.frame_index < 0:
             return
         self.skip_step = self.skip_step - 1 if self.skip_step > 0 else 0
@@ -176,11 +178,14 @@ class Agent:
         self.card_types.append(card_type)
         self.card_properties.append(card_property)
 
-        img_state = img[self.offset_h: self.offset_h + self.height, self.offset_w: - self.offset_w, :]
+        img_state = self._crop_battle_filed(img)
         img_state = cv2.resize(img_state, (192, 256))
         self.imgs.append(img_state)
 
         return [img_state, env_state, card_type, card_property]
+
+    def _crop_battle_filed(self, img):
+        return img[self.offset_h: self.offset_h + self.height, self.offset_w: - self.offset_w, :]
 
     def _action_on_finish(self, result, img):
         self._finish_game()
@@ -230,7 +235,7 @@ class Agent:
     def _record_reward(self, result, img):
         if self.game_start and not self.game_finish:
             self.game_finish = True
-            self.game_start = False
+            # self.game_start = False
             reward = 0
             if result.battle_result == 1:
                 reward = 1 - result.time * 0.001
@@ -238,7 +243,7 @@ class Agent:
                 reward = -1 + result.time * 0.001
 
             skip_frame = 2
-            self._update_reward(reward, len(self.rewards) - skip_frame)
+            self._update_reward(reward, len(self.rewards) - skip_frame - 1)
 
             if self.record:
                 self.record.record_finish_img(result.frame_index, img)
@@ -297,7 +302,8 @@ class Agent:
             start_x = self.card_location[card][0]
             start_y = self.card_location[card][1]
             logger.info(
-                "locate card {} {} {} {} {}.".format(card, action["pos_x"][0], action["pos_y"][0], loc_x, loc_y))
+                "locate card {} {} {} {} {} {}.".format(card, action["card_prob"][0], action["pos_x"][0],
+                                                        action["pos_y"][0], loc_x, loc_y))
             if self.real_time:
                 self.device.swipe([start_x, start_y, loc_x, loc_y])
             choice_index = [0]

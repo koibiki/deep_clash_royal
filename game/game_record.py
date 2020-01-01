@@ -56,7 +56,7 @@ class Record(object):
 		self.game_episodes += 1
 
 	def record_error_img(self, index, img):
-		self.check_game_valid()
+		# self.check_game_valid()
 		cv2.imwrite(osp.join(self.error_dir, "{:d}.jpg".format(index)), img)
 
 	def record_running_img(self, imgs):
@@ -101,3 +101,7 @@ class Record(object):
 		os.rename(old_path, new_path)
 		self.record_episode_result(result)
 		self.game_id = -1
+
+	def record_pattern(self, pattern):
+		cv2.imwrite(osp.join(self.root, "pattern.jpg"), pattern)
+
