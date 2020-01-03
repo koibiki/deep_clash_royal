@@ -20,7 +20,7 @@ private:
     int COLOR_DICT[3][3][2] = {
             {{35,  85},  {35,  85},  {195, 255}},
             {{225, 255}, {175, 215}, {85,  115}},
-            {{65, 100}, {65, 100}, {225, 255}},
+            {{50, 115}, {50, 115}, {220, 255}},
     };
 
     Rect opp_pattern_rect = {15, 55, 24, 30};
@@ -31,7 +31,7 @@ private:
 
     int pre_opp_crown = 0;
     int pre_mine_crown = 0;
-    bool debug = false;
+    bool debug = true;
 
     Mat process_img(Mat &src, int color_index);
 
@@ -39,15 +39,13 @@ private:
 
     int get_most_possible_num(Mat &src, bool is_opp);
 
-    bool has_split_line(Mat &src);
-
 public:
 
     RunningDetect();
 
     RunningResult detect_running(Mat &src , int frame_index);
 
-
+    bool has_split_line(Mat &src);
 };
 
 

@@ -20,20 +20,14 @@ RunningResult RunningDetect::detect_running(Mat &src, int frame_index) {
     int start_h = height / 4;
     int clip_h = height / 3;
 
-    int split_line_start_h = height * 3 / 7 + height / 100;
-    int split_line_h = height * 3 / 7 + height / 60 - split_line_start_h;
-    int split_line_start_w = width / 4;
-    int split_line_w = width * 3 / 4;
 
     Rect opp_clip_rect(start_w, start_h, clip_w, clip_h / 2);
     Rect mine_clip_rect(start_w, start_h + clip_h / 2, clip_w, clip_h / 2);
 
-    Rect split_line_clip_rect(split_line_start_w, split_line_start_h, split_line_w, split_line_h);
-
 
     Mat opp_clip_mat = src(opp_clip_rect);
     Mat mine_clip_mat = src(mine_clip_rect);
-    Mat split_line = src(split_line_clip_rect);
+
     Mat opp_mat = process_img(opp_clip_mat, 0);
     Mat mine_mat = process_img(mine_clip_mat, 1);
 
@@ -51,7 +45,7 @@ RunningResult RunningDetect::detect_running(Mat &src, int frame_index) {
 //    cv::imwrite("../crown_num/opp_" + to_string(frame_index) + ".jpg", opp_mat(opp_pattern_rect));
 //    cv::imwrite("../crown_num/mine_" + to_string(frame_index) + ".jpg", mine_mat(mine_pattern_rect));
 
-    bool skip = has_split_line(split_line);
+    bool skip = has_split_line(src);
 
     if (skip && opp_rect.width > 0 && mine_rect.width > 0 && opp_rect.height > 0 && mine_rect.height > 0) {
         Mat opp_num = opp_mat(opp_pattern_rect);
@@ -77,25 +71,42 @@ Mat RunningDetect::process_img(Mat &src, int color_index) {
 bool RunningDetect::has_split_line(Mat &src) {
 
     int width = src.cols;
+    int height = src.rows;
+
+    int split_line_start_h = height * 3 / 7 + height / 100;
+    int split_line_h = height * 3 / 7 + height / 60 - split_line_start_h;
+    int split_line_start_w = width / 4;
+    int split_line_w = width / 2;
+
+    Rect split_line_clip_rect(split_line_start_w, split_line_start_h, split_line_w, split_line_h);
+
+    Mat split_line = src(split_line_clip_rect);
 
     vector<Rect> possible_rects;
 
     vector<vector<Point> > contours;
 
-    Mat thresh = this->binary_thresh_mat(src, COLOR_DICT, 2);
+    Mat thresh = this->binary_thresh_mat(split_line, COLOR_DICT, 2);
+
+    Mat element = getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
+    cv::dilate(thresh, thresh, element);
+
+    if (debug){
+        cv::imshow("origin", split_line);
+        cv::imshow("split line", thresh);
+    }
 
     findContours(thresh, contours, cv::RETR_CCOMP, cv::CHAIN_APPROX_SIMPLE);
-
+    
+    int sum_width = 0;
     for (int i = 0; i < contours.size(); i++) {
         vector<Point> points = contours[i];
         RotatedRect rect = minAreaRect(points);
 
         Rect possible_rect = rect.boundingRect();
-        if (possible_rect.width * 1.0f / width > 0.8) {
-            return true;
-        }
+        sum_width += possible_rect.width;
     }
-    return false;
+    return sum_width * 1.0f / split_line_w > 0.5;
 }
 
 Rect RunningDetect::get_crown_num_rect(Mat &src, bool is_opp) {
